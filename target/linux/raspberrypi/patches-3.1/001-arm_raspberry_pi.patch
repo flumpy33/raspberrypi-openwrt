@@ -23722,7 +23722,7 @@ index 8c87096..1e71ddc 100644
  config MMC_ATMELMCI_DMA
  	bool "Atmel MCI DMA support"
 diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index b4b83f3..3cc61a0 100644
+index b4b83f3..eeb683c 100644
 --- a/drivers/mmc/host/Makefile
 +++ b/drivers/mmc/host/Makefile
 @@ -13,6 +13,7 @@ obj-$(CONFIG_MMC_SDHCI_PXAV3)	+= sdhci-pxav3.o
@@ -23737,7 +23737,7 @@ index b4b83f3..3cc61a0 100644
  obj-$(CONFIG_MMC_SDHI)		+= sh_mobile_sdhi.o
  obj-$(CONFIG_MMC_CB710)		+= cb710-mmc.o
  obj-$(CONFIG_MMC_VIA_SDMMC)	+= via-sdmmc.o
- obj-$(CONFIG_GPIOMMC) 		+= gpiommc.o
+ obj-$(CONFIG_GPIOMMC)		+= gpiommc.o
 +obj-$(CONFIG_MMC_BCM2708)       += bcm2708_mci.o
  obj-$(CONFIG_SDH_BFIN)		+= bfin_sdh.o
  obj-$(CONFIG_MMC_DW)		+= dw_mmc.o
