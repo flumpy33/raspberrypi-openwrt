@@ -1,0 +1,8 @@
+--- /dev/null
++++ b/fatfs/CMakeLists.txt
+@@ -0,0 +1,5 @@
++cmake_minimum_required(VERSION 2.8)
++
++# FatFS library
++add_library(fatfs src/ff.c src/option/ccsbcs.c)
++
