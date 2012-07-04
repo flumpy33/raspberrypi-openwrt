@@ -309,7 +309,7 @@ static void populate_fs(char **dopt, int didx, int verbose)
 }
 
 // TODO: add version info in cmake file?
-#define VERSION "0.1"
+#define VERSION "0.2"
 static void showversion(void)
 {
 	printf("genfatfs " VERSION "\n");

@@ -135,8 +135,8 @@ DRESULT disk_ioctl(BYTE drive, BYTE command, void* buffer)
       struct stat stbuf;
       if (fstat(fileno(fp), &stbuf) == 0)
       {
-        WORD nrSectors = stbuf.st_size / _MAX_SS;
-        WORD * pW = (WORD *)buffer;
+        DWORD nrSectors = stbuf.st_size / _MAX_SS;
+        DWORD * pW = (DWORD *)buffer;
         *pW = nrSectors;
 
         rv = RES_OK;
