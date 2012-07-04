@@ -28,8 +28,6 @@ define Build/Compile
 endef
 
 define Build/InstallDev
-	rm -rf $(BOOTFS_DIR)
-	mkdir -p $(BOOTFS_DIR)
 	$(CP) $(PKG_BUILD_DIR)/boot/arm128_start.elf $(BOOTFS_DIR)
 	$(CP) $(PKG_BUILD_DIR)/boot/arm192_start.elf $(BOOTFS_DIR)
 	$(CP) $(PKG_BUILD_DIR)/boot/arm224_start.elf $(BOOTFS_DIR)
@@ -38,10 +36,6 @@ define Build/InstallDev
 	$(CP) $(PKG_BUILD_DIR)/boot/LICENCE.broadcom $(BOOTFS_DIR)
 	$(CP) $(PKG_BUILD_DIR)/boot/loader.bin $(BOOTFS_DIR)
 	$(CP) $(PKG_BUILD_DIR)/boot/start.elf $(BOOTFS_DIR)
-endef
-
-define Build/Clean
-	rm -f $(BOOTFS_DIR)
 endef
 
 $(eval $(call Build/DefaultTargets))

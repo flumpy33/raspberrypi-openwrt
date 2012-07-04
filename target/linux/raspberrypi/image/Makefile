@@ -31,6 +31,8 @@ CONFIG_TARGET_BOOTFS_PARTSIZE:=16
 FATSIZE=$(shell echo $$(($(CONFIG_TARGET_BOOTFS_PARTSIZE)*1024)))
 
 define Image/Build/fatfs
+	rm -rf $(BOOTFS_DIR)
+	mkdir -p $(BOOTFS_DIR)
 	$(MAKE) -C firmware "BOOTFS_DIR=$(BOOTFS_DIR)" compile
 	$(CP) $(KERNEL_IMG) $(BOOTFS_DIR)
 	@echo "TODO: generate cmdline.txt"
