@@ -1,3 +1,20 @@
+// fat filesystem generator for embedded systems
+// Copyright (C) 2012 Nathan Huizinga <nathan.huizinga@gmail.com>
+//
+// Please direct support requests to raspberrypi-openwrt-dev@googlegroups.com
+//
+// 'genext2fs' portions taken from genext2fs.c in getext2fs:
+//	Copyright (C) 2000 by Xavier Bestel <xavier.bestel@free.fr>
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; version
+// 2 of the License.
+//
+// Changes:
+// 	 4 Jul 2012	Initial release
+//
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -296,6 +313,7 @@ static void populate_fs(char **dopt, int didx, int verbose)
 static void showversion(void)
 {
 	printf("genfatfs " VERSION "\n");
+	printf("Using FatFs version R0.09 (http://elm-chan.org/fsw/ff/00index_e.html)\n");
 }
 
 static void showhelp(void)
@@ -377,7 +395,7 @@ int main(int argc, char ** argv)
 	fsout = argv[optind];
 
   // No input file, create one
-  int fileSize = nbblocks * _MAX_SS;
+  int fileSize = nbblocks * 1024;
 
   if (nbblocks < 8)
     error_msg_and_die("Too few blocks, see --help.");
