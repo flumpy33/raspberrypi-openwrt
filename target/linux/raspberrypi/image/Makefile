@@ -41,13 +41,13 @@ define Image/Build/fatfs
 endef
 
 define Image/Build/sdcard
-	@echo "TODO: image/build/sdcard"
+	./gen_image_raspberrypi.sh $(BIN_DIR)/$(IMG_PREFIX)-sdcard.img $(CONFIG_TARGET_BOOTFS_PARTSIZE) $(BOOTFS_IMAGE) $(CONFIG_TARGET_ROOTFS_PARTSIZE) $(1)
 endef
 
 define Image/Build
 	$(call Image/Build/fatfs)
 	$(call Image/Build/$(1))
-	$(call Image/Build/sdcard)
+	$(call Image/Build/sdcard,$(KDIR)/root.$(1))
 	dd if=$(KDIR)/root.$(1) of=$(BIN_DIR)/$(IMG_PREFIX)-root.$(1) bs=128k conv=sync
 	dd if=$(BOOTFS_IMAGE) of=$(BIN_DIR)/$(IMG_PREFIX)-boot.fat bs=128k conv=sync
 endef
