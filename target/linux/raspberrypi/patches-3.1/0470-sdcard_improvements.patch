@@ -1,0 +1,78 @@
+From c8854b6898599fccfa6a2cd72d8392026f3e9854 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Thu, 17 May 2012 14:44:19 +0100
+Subject: [PATCH] sdcard patch improvements from naren
+
+
+diff --git a/drivers/mmc/host/sdhci-bcm2708.c b/drivers/mmc/host/sdhci-bcm2708.c
+index cae6be9..7136998 100644
+--- a/drivers/mmc/host/sdhci-bcm2708.c
++++ b/drivers/mmc/host/sdhci-bcm2708.c
+@@ -896,8 +896,7 @@ static void sdhci_bcm2708_dma_complete_irq(struct sdhci_host *host,
+ 		   We get CRC and DEND errors unless we wait for
+ 		   the SD controller to finish reading/writing to the card. */
+ 		u32 state_mask;
+-		int timeout=1000000;
+-		hptime_t now = hptime();
++		int timeout=1000;
+ 
+ 		DBG("PDMA over - sync card\n");
+ 		if (data->flags & MMC_DATA_READ)
+@@ -905,17 +904,12 @@ static void sdhci_bcm2708_dma_complete_irq(struct sdhci_host *host,
+ 		else
+ 			state_mask = SDHCI_DOING_WRITE;
+ 
+-		while (0 != (sdhci_bcm2708_raw_readl(host,
+-						     SDHCI_PRESENT_STATE) &
+-			     state_mask) && --timeout > 0)
++		while (0 != (sdhci_bcm2708_raw_readl(host, SDHCI_PRESENT_STATE) 
++			& state_mask) && --timeout > 0)
++		{
++			udelay(100);
+ 			continue;
+-
+-		if (1000000-timeout > 4000) /*ave. is about 3250*/
+-			DBG("%s: note - long %s sync %luns - "
+-			       "%d its.\n",
+-			       mmc_hostname(host->mmc),
+-			       data->flags & MMC_DATA_READ? "read": "write",
+-			       since_ns(now), 1000000-timeout);
++		}
+ 		if (timeout <= 0)
+ 			printk(KERN_ERR"%s: final %s to SD card still "
+ 			       "running\n",
+@@ -1293,10 +1287,7 @@ static unsigned int sdhci_bcm2708_uhs_broken(struct sdhci_host *host)
+ 
+ static unsigned int sdhci_bcm2708_missing_status(struct sdhci_host *host)
+ {
+-	if(host->last_cmdop == MMC_SEND_STATUS)
+-		return 1;
+-	else
+-		return 0;
++	return 1;
+ }
+ 
+ /***************************************************************************** \
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index a49761b..a6c0b36 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -968,7 +968,8 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
+ 		mask |= SDHCI_DATA_INHIBIT;
+ 
+ 	if(host->ops->missing_status && (cmd->opcode == MMC_SEND_STATUS)) {
+-		timeout = 100;
++		timeout = 5000; // Really obscenely large delay to send the status, due to bug in controller
++				// which might cause the STATUS command to get stuck when a data operation is in flow
+ 		mask |= SDHCI_DATA_INHIBIT;
+ 	}
+ 
+@@ -2052,7 +2053,7 @@ static void sdhci_timeout_timer(unsigned long data)
+ 
+ 	if (host->mrq) {
+ 		pr_err("%s: Timeout waiting for hardware "
+-			"interrupt.\n", mmc_hostname(host->mmc));
++				"interrupt - cmd%d.\n", mmc_hostname(host->mmc), host->last_cmdop);
+ 		sdhci_dumpregs(host);
+ 
+ 		if (host->data) {

@@ -1,0 +1,61 @@
+From 906501202a38d6d9697cc7024928ec9d93d37d8d Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Tue, 8 May 2012 23:12:13 +0100
+Subject: [PATCH] possible fix for sdcard missing status. Thank naren
+
+
+diff --git a/drivers/mmc/host/sdhci-bcm2708.c b/drivers/mmc/host/sdhci-bcm2708.c
+index 4b23c8b..cae6be9 100644
+--- a/drivers/mmc/host/sdhci-bcm2708.c
++++ b/drivers/mmc/host/sdhci-bcm2708.c
+@@ -1291,6 +1291,14 @@ static unsigned int sdhci_bcm2708_uhs_broken(struct sdhci_host *host)
+         return 1;
+ }
+ 
++static unsigned int sdhci_bcm2708_missing_status(struct sdhci_host *host)
++{
++	if(host->last_cmdop == MMC_SEND_STATUS)
++		return 1;
++	else
++		return 0;
++}
++
+ /***************************************************************************** \
+  *									     *
+  * Device ops								     *
+@@ -1328,6 +1336,7 @@ static struct sdhci_ops sdhci_bcm2708_ops = {
+ 	.spurious_crc_acmd51 = sdhci_bcm2708_quirk_spurious_crc,
+ 	.voltage_broken = sdhci_bcm2708_quirk_voltage_broken,
+ 	.uhs_broken = sdhci_bcm2708_uhs_broken,
++	.missing_status = sdhci_bcm2708_missing_status,
+ };
+ 
+ /*****************************************************************************\
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 49094d2..a49761b 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -967,6 +967,11 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
+ 	if ((cmd->data != NULL) || (cmd->flags & MMC_RSP_BUSY))
+ 		mask |= SDHCI_DATA_INHIBIT;
+ 
++	if(host->ops->missing_status && (cmd->opcode == MMC_SEND_STATUS)) {
++		timeout = 100;
++		mask |= SDHCI_DATA_INHIBIT;
++	}
++
+ 	/* We shouldn't wait for data inihibit for stop commands, even
+ 	   though they might use busy signaling */
+ 	if (host->mrq->data && (cmd == host->mrq->data->stop))
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 5ad82d9..673743f 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -290,6 +290,7 @@ struct sdhci_ops {
+ 	unsigned int	(*spurious_crc_acmd51)(struct sdhci_host *host);
+ 	unsigned int	(*voltage_broken)(struct sdhci_host *host);
+ 	unsigned int	(*uhs_broken)(struct sdhci_host *host);
++	unsigned int	(*missing_status)(struct sdhci_host *host);
+ 
+ 	void	(*hw_reset)(struct sdhci_host *host);
+ };
