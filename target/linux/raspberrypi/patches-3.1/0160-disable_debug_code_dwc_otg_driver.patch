@@ -1,0 +1,48 @@
+From 1439ce8ed17190a4ba91e9a43ee3fd66035dec7d Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Sat, 17 Mar 2012 23:05:37 +0000
+Subject: [PATCH] Disable debug code in dwc_otg driver unless CONFIG_USB_DEBUG
+ is set
+
+
+diff --git a/drivers/usb/host/dwc_common_port/Makefile b/drivers/usb/host/dwc_common_port/Makefile
+index 3b2ac70..b1a74eb 100644
+--- a/drivers/usb/host/dwc_common_port/Makefile
++++ b/drivers/usb/host/dwc_common_port/Makefile
+@@ -6,7 +6,9 @@ ifneq ($(KERNELRELEASE),)
+ 
+ #CPPFLAGS	+= -DDEBUG_MEMORY
+ 
++ifeq ($(CONFIG_USB_DEBUG),y)
+ CPPFLAGS	+= -DDEBUG
++endif
+ CPPFLAGS	+= -DDWC_LINUX
+ 
+ obj-$(CONFIG_USB_DWCOTG)	+= dwc_common_port_lib.o
+diff --git a/drivers/usb/host/dwc_common_port/dwc_os.h b/drivers/usb/host/dwc_common_port/dwc_os.h
+index 8d38014..453966a 100644
+--- a/drivers/usb/host/dwc_common_port/dwc_os.h
++++ b/drivers/usb/host/dwc_common_port/dwc_os.h
+@@ -216,6 +216,7 @@ extern void __DWC_DEBUG(char *format, ...)
+ #endif
+ #else
+ #define __DWC_DEBUG printk
++#include <linux/kernel.h>
+ #endif
+ 
+ /**
+diff --git a/drivers/usb/host/dwc_otg/Makefile b/drivers/usb/host/dwc_otg/Makefile
+index 161fe37..fed13f4 100644
+--- a/drivers/usb/host/dwc_otg/Makefile
++++ b/drivers/usb/host/dwc_otg/Makefile
+@@ -9,7 +9,9 @@ ifeq ($(BUS_INTERFACE),)
+ 	BUS_INTERFACE = -DPLATFORM_INTERFACE=1
+ endif
+ 
+-CPPFLAGS	+= -DDEBUG 
++ifeq ($(CONFIG_USB_DEBUG),y)
++CPPFLAGS	+= -DDEBUG
++endif
+ 
+ # Use one of the following flags to compile the software in host-only or
+ # device-only mode.

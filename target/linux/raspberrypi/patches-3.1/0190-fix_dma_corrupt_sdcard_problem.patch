@@ -1,0 +1,31 @@
+From ecab81830648bd654317676a3419a9769522c611 Mon Sep 17 00:00:00 2001
+From: Dom Cobley <dc4@broadcom.com>
+Date: Tue, 20 Mar 2012 15:04:40 +0000
+Subject: [PATCH] Fix problem with dma that could corrupt sdcard, especially
+ when L2 enabled
+
+
+diff --git a/drivers/mmc/host/sdhci-bcm2708.c b/drivers/mmc/host/sdhci-bcm2708.c
+index 398a04e..d019bb2 100644
+--- a/drivers/mmc/host/sdhci-bcm2708.c
++++ b/drivers/mmc/host/sdhci-bcm2708.c
+@@ -510,7 +510,8 @@ static void schci_bcm2708_cb_read(struct sdhci_bcm2708_priv *host,
+ 	cb->stride = 0;
+ 
+ 	if (is_last) {
+-		cb->info |= BCM2708_DMA_INT_EN;
++		cb->info |= BCM2708_DMA_INT_EN |
++		     BCM2708_DMA_WAIT_RESP;
+ 		cb->next = 0;
+ 	} else
+ 		cb->next = host->cb_handle +
+@@ -541,7 +542,8 @@ static void schci_bcm2708_cb_write(struct sdhci_bcm2708_priv *host,
+ 	cb->stride = 0;
+ 
+ 	if (is_last) {
+-		cb->info |= BCM2708_DMA_INT_EN;
++		cb->info |= BCM2708_DMA_INT_EN |
++		     BCM2708_DMA_WAIT_RESP;
+ 		cb->next = 0;
+ 	} else
+ 		cb->next = host->cb_handle +

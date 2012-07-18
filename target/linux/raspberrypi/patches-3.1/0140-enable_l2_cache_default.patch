@@ -1,0 +1,43 @@
+From 2fe771a79d07fee48af401711c8b5e80e8623610 Mon Sep 17 00:00:00 2001
+From: Dom Cobley <dc4@broadcom.com>
+Date: Wed, 7 Mar 2012 23:22:59 +0000
+Subject: [PATCH] Enable L2 cache is now the default. Invert sense of L2 flags
+
+
+diff --git a/arch/arm/mach-bcm2708/Kconfig b/arch/arm/mach-bcm2708/Kconfig
+index d3d3db7..5593167 100644
+--- a/arch/arm/mach-bcm2708/Kconfig
++++ b/arch/arm/mach-bcm2708/Kconfig
+@@ -22,11 +22,11 @@ config BCM2708_VCMEM
+         help
+           Helper for videocore memory access and total size allocation.	   
+ 
+-config BCM2708_L2CACHE
+-	bool "Videocore L2 cache"
++config BCM2708_NOL2CACHE
++	bool "Videocore L2 cache disable"
+ 	depends on MACH_BCM2708
+         default n
+         help
+-          Allow ARM to use GPU's L2 cache. Requires enable_l2cache in config.txt.
++          Do not allow ARM to use GPU's L2 cache. Requires disable_l2cache in config.txt.
+ 
+ endmenu
+diff --git a/arch/arm/mach-bcm2708/include/mach/memory.h b/arch/arm/mach-bcm2708/include/mach/memory.h
+index 771bdf1..b855d85 100644
+--- a/arch/arm/mach-bcm2708/include/mach/memory.h
++++ b/arch/arm/mach-bcm2708/include/mach/memory.h
+@@ -35,10 +35,10 @@
+ #define PHYS_OFFSET	 UL(0x00000000)
+ #define ARMMEM_OFFSET    UL(0x00000000)   /* offset in VC of ARM memory */
+ 
+-#ifdef CONFIG_BCM2708_L2CACHE
+- #define _REAL_BUS_OFFSET UL(0x40000000)   /* use L2 cache */
+-#else
++#ifdef CONFIG_BCM2708_NOL2CACHE
+  #define _REAL_BUS_OFFSET UL(0xC0000000)   /* don't use L1 or L2 caches */
++#else
++ #define _REAL_BUS_OFFSET UL(0x40000000)   /* use L2 cache */
+ #endif
+ 
+ /* We're using the memory at 64M in the VideoCore for Linux - this adjustment
