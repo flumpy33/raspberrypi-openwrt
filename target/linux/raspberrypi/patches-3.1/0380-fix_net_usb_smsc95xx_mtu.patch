@@ -1,0 +1,30 @@
+From c272678aa4e098a1c933eafe9fa8aeeeab1cdeae Mon Sep 17 00:00:00 2001
+From: Stephane Fillod <fillods@users.sf.net>
+Date: Fri, 20 Apr 2012 09:39:23 +0000
+Subject: [PATCH] net: usb: smsc95xx: fix mtu
+
+Make smsc95xx recalculate the hard_mtu after adjusting the
+hard_header_len.
+
+Without this, usbnet adjusts the MTU down to 1488 bytes, and the host is
+unable to receive standard 1500-byte frames from the device.
+
+Inspired by same fix on cdc_eem 78fb72f7936c01d5b426c03a691eca082b03f2b9.
+
+Tested on ARM/Beagle.
+
+Signed-off-by: Stephane Fillod <fillods@users.sf.net>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/net/usb/smsc95xx.c b/drivers/net/usb/smsc95xx.c
+index 5a2e12b..ad7341c 100644
+--- a/drivers/net/usb/smsc95xx.c
++++ b/drivers/net/usb/smsc95xx.c
+@@ -1072,6 +1072,7 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
+ 	dev->net->ethtool_ops = &smsc95xx_ethtool_ops;
+ 	dev->net->flags |= IFF_MULTICAST;
+ 	dev->net->hard_header_len += SMSC95XX_TX_OVERHEAD_CSUM;
++	dev->hard_mtu = dev->net->mtu + dev->net->hard_header_len;
+ 	return 0;
+ }
+ 

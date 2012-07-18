@@ -1,0 +1,39 @@
+From e09244e60881148431ecd016ccc42f1fa0678556 Mon Sep 17 00:00:00 2001
+From: Dom Cobley <dc4@broadcom.com>
+Date: Mon, 30 Apr 2012 14:45:52 +0100
+Subject: [PATCH] added support for TT in the USB driver. Thanks Naren
+
+
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 6690bdb..9bde3b4 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -525,14 +525,6 @@ config USB_GADGET_SUPERSPEED
+ 	depends on USB_GADGET
+ 	depends on USB_GADGET_DUALSPEED
+ 
+-config USB_GADGET_SNPS_DWC_OTG
+-	boolean "Synopsys Driver for DWC_otg Controller"
+-	depends on USB && EXPERIMENTAL
+-	select USB_OTG
+-	select USB_GADGET_DUALSPEED
+-	help
+-	   Selects the Synopsys Driver for the DWC_otg Controller.
+-
+ config USB_DWC_OTG_LPM
+ 	boolean "Enable LPM support"
+ 	depends on USB && EXPERIMENTAL
+diff --git a/drivers/usb/host/dwc_otg/dwc_otg_hcd_linux.c b/drivers/usb/host/dwc_otg/dwc_otg_hcd_linux.c
+index 5261d2a..e7b90c8 100644
+--- a/drivers/usb/host/dwc_otg/dwc_otg_hcd_linux.c
++++ b/drivers/usb/host/dwc_otg/dwc_otg_hcd_linux.c
+@@ -417,6 +417,9 @@ int hcd_init(
+ 
+ 	hcd->regs = otg_dev->base;
+ 
++	/* Integrate TT in root hub */
++	hcd->has_tt = 1;
++
+ 	/* Initialize the DWC OTG HCD. */
+ 	dwc_otg_hcd = dwc_otg_hcd_alloc_hcd();
+ 	if (!dwc_otg_hcd) {
