@@ -1,0 +1,32 @@
+From d461c6d577070637ceeae52ea019e6d907b21c47 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Wed, 11 Jul 2012 13:55:11 +0100
+Subject: [PATCH] Add missing UART0_CLOCK from last commit
+
+
+diff --git a/arch/arm/mach-bcm2708/bcm2708.c b/arch/arm/mach-bcm2708/bcm2708.c
+index a466f44..bf9f730 100644
+--- a/arch/arm/mach-bcm2708/bcm2708.c
++++ b/arch/arm/mach-bcm2708/bcm2708.c
+@@ -183,7 +183,7 @@ unsigned long long sched_clock(void)
+  * These are fixed clocks.
+  */
+ static struct clk ref24_clk = {
+-	.rate = 3000000,	/* The UART is clocked at 3MHz via APB_CLK */
++	.rate = UART0_CLOCK,	/* The UART is clocked at 3MHz via APB_CLK */
+ };
+ 
+ static struct clk osc_clk = {
+diff --git a/arch/arm/mach-bcm2708/include/mach/platform.h b/arch/arm/mach-bcm2708/include/mach/platform.h
+index 3085af1..5a797ac 100644
+--- a/arch/arm/mach-bcm2708/include/mach/platform.h
++++ b/arch/arm/mach-bcm2708/include/mach/platform.h
+@@ -216,7 +216,7 @@
+ #define PM_RSTS_HADDRF_SET                                 0x00000002
+ #define PM_RSTS_HADDRQ_SET                                 0x00000001
+ 
+-
++#define UART0_CLOCK      3000000
+ 
+ #endif
+ 

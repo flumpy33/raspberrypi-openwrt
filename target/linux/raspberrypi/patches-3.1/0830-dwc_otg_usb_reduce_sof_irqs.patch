@@ -1,0 +1,591 @@
+From 85b7821857dd0b9cabab59d47f08eabed74679a3 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Fri, 6 Jul 2012 18:30:43 +0100
+Subject: [PATCH] Add mechanism to reduce the number of SOF interrupts in
+ dwc_otg USB driver. Enable through
+ /proc/dwc_sof/SOF_reduction
+
+
+diff --git a/drivers/usb/host/dwc_common_port/dwc_common_linux.c b/drivers/usb/host/dwc_common_port/dwc_common_linux.c
+index cef068f..f269b39 100644
+--- a/drivers/usb/host/dwc_common_port/dwc_common_linux.c
++++ b/drivers/usb/host/dwc_common_port/dwc_common_linux.c
+@@ -1021,7 +1021,7 @@ static void timer_callback(unsigned long data)
+ {
+ 	dwc_timer_t *timer = (dwc_timer_t *)data;
+ 	set_scheduled(timer, 0);
+-	DWC_DEBUG("Timer %s callback", timer->name);
++	/*DWC_DEBUG("Timer %s callback", timer->name);*/
+ 	timer->cb(timer->data);
+ }
+ 
+diff --git a/drivers/usb/host/dwc_otg/Makefile b/drivers/usb/host/dwc_otg/Makefile
+index fed13f4..67bb457 100644
+--- a/drivers/usb/host/dwc_otg/Makefile
++++ b/drivers/usb/host/dwc_otg/Makefile
+@@ -15,9 +15,14 @@ endif
+ 
+ # Use one of the following flags to compile the software in host-only or
+ # device-only mode.
+-#CPPFLAGS        += -DDWC_HOST_ONLY
++ifeq ($(CONFIG_USB_GADGET_DWCOTG),)
++CPPFLAGS         += -DDWC_HOST_ONLY
++endif
+ #CPPFLAGS        += -DDWC_DEVICE_ONLY
+ 
++# Use this flag to reduce SOF interrupt service overhead
++CPPFLAGS        += -DSOF_FIX
++
+ CPPFLAGS	+= -Dlinux -DDWC_HS_ELECT_TST
+ #CGG: CPPFLAGS	+= -DDWC_EN_ISOC
+ CPPFLAGS   	+= -I$(obj)/../dwc_common_port
+diff --git a/drivers/usb/host/dwc_otg/dwc_otg_driver.c b/drivers/usb/host/dwc_otg/dwc_otg_driver.c
+index 0e22013..5b4fef5 100644
+--- a/drivers/usb/host/dwc_otg/dwc_otg_driver.c
++++ b/drivers/usb/host/dwc_otg/dwc_otg_driver.c
+@@ -82,6 +82,11 @@
+ 
+ # include <linux/irq.h>
+ 
++#ifdef SOF_FIX
++#include <asm/uaccess.h>
++#include <linux/proc_fs.h>
++#endif
++
+ #include <asm/io.h>
+ 
+ 
+@@ -178,6 +183,8 @@ struct dwc_otg_driver_module_params {
+ 	int32_t lpm_enable;
+ 	int32_t ic_usb_cap;
+ 	int32_t ahb_thr_ratio;
++	int32_t sof_setting;		// 0=off, 1=on
++	int32_t proc_init_done;		// 0=not done, 1=done
+ };
+ 
+ static struct dwc_otg_driver_module_params dwc_otg_module_params = {
+@@ -254,9 +261,139 @@ static struct dwc_otg_driver_module_params dwc_otg_module_params = {
+ 	.lpm_enable = -1,
+ 	.ic_usb_cap = -1,
+ 	.ahb_thr_ratio = -1,
++	.sof_setting = 0,
++	.proc_init_done = 0,
+ };
+ 
+ /**
++ * PROC_FS SUPPORT
++ * proc_fs support for setting the Start-of-Frame (SOF) interrupt processing
++ *  fix (reducing SOF interrupts by an order of magnitude).  When set
++ *  to "on" the SOF interrupt will only be turned on once per tick, for
++ *  3 micro-frame times.  When set to "off" it will not turn off the
++ *  SOF interrupt, and process all 8000 per second.
++ */
++
++#ifdef SOF_FIX
++
++static struct proc_dir_entry *proc_dir, *proc_file;
++
++int sof_setting(void)
++{
++    return dwc_otg_module_params.sof_setting;
++}
++
++static int sof_read_data (char *page,
++			  char **start,
++                          off_t off,
++			  int count,
++                          int *eof,
++			  void *data)
++{
++
++	if (dwc_otg_module_params.sof_setting == 1)
++	{
++		sprintf(page, "on\n");
++		return 4;
++	}
++	else
++	{
++		sprintf(page, "off\n");
++		return 5;
++	}
++	return 0;
++}
++
++#define PROC_FS_MAX_SIZE	1024
++#define PROC_FS_NAME		"SOF_reduction"
++
++static char proc_fs_buffer[PROC_FS_MAX_SIZE];
++
++static int sof_write_data (struct file *file,
++			   const char __user *buffer,
++                           unsigned long count,
++			   void *data)
++{
++	unsigned long buffer_size = count;
++
++	if (buffer_size > PROC_FS_MAX_SIZE)
++		buffer_size = PROC_FS_MAX_SIZE;
++
++	memset(proc_fs_buffer, 0, sizeof(proc_fs_buffer));
++
++	if (copy_from_user(proc_fs_buffer, buffer, buffer_size))
++	{
++		printk(KERN_ERR "\nSOF_write_data: copy_from_user failure\n");
++		return -EFAULT;
++	}
++
++	if ((strnlen(proc_fs_buffer, PROC_FS_MAX_SIZE) == 3) &&
++	    (strncmp(proc_fs_buffer, "on", 2) == 0))
++	{
++		printk(KERN_ERR "\n%s: Setting SOF (reduction) ON.\n", PROC_FS_NAME);
++		dwc_otg_module_params.sof_setting = 1;
++	}
++	else if ((strnlen(proc_fs_buffer, PROC_FS_MAX_SIZE) == 4) &&
++	         (strncmp(proc_fs_buffer, "off", 3) == 0))
++	{
++		printk(KERN_ERR "\n%s: Setting SOF reduction OFF.\n",PROC_FS_NAME);
++		dwc_otg_module_params.sof_setting = 0;
++	}
++	else
++		printk(KERN_ERR "\n%s: input not \'on\' or \'off\', ignored.\n", PROC_FS_NAME);
++#ifdef DEBUG_SOF_FIX
++		printk(KERN_ERR "\n%s:buffer %s, len = %d.\n",__func__,
++			proc_fs_buffer, strnlen(proc_fs_buffer, PROC_FS_MAX_SIZE));
++#endif
++
++	return buffer_size;
++}
++
++/**
++ * Initialize proc_fs entry for SOF setting.
++ */
++static int init_proc_fs(void)
++{
++	int retval = 0;
++
++	if (dwc_otg_module_params.proc_init_done)
++		return 0;
++
++	proc_dir = proc_mkdir_mode("dwc_sof", 0755, NULL);
++
++        if(proc_dir == NULL)
++        {
++		retval = -ENOMEM;
++		printk("Error creating dir\n");
++		return retval;
++        }
++
++	proc_file = create_proc_entry(PROC_FS_NAME, 0666, proc_dir);
++
++	if (proc_file != NULL)
++	{
++		dwc_otg_module_params.proc_init_done = 1;
++		proc_file->read_proc  = sof_read_data;
++		proc_file->write_proc = sof_write_data;
++		proc_file->mode       = S_IFREG | S_IRUGO;
++		proc_file->uid        = 0;
++		proc_file->gid        = 0;
++		proc_file->gid        = PROC_FS_MAX_SIZE;
++	}
++	else
++	{
++		retval = -ENOMEM;
++		printk("Error creating file\n");
++		remove_proc_entry(PROC_FS_NAME, NULL);
++	}
++
++	return retval;
++}
++
++#endif
++
++
++/**
+  * This function shows the Driver Version.
+  */
+ static ssize_t version_show(struct device_driver *dev, char *buf)
+@@ -845,6 +982,12 @@ struct platform_device *_dev
+ 	dev_dbg(&_dev->dev, "Calling attr_create\n");
+ 	dwc_otg_attr_create(_dev);
+ 
++#ifdef SOF_FIX
++	retval = init_proc_fs();
++	if (retval)
++		goto fail;
++#endif
++
+ 	/*
+ 	 * Disable the global interrupt until all the interrupt
+ 	 * handlers are installed.
+@@ -1015,6 +1158,7 @@ static struct platform_driver dwc_otg_driver = {
+  *
+  * @return
+  */
++
+ static int __init dwc_otg_driver_init(void)
+ {
+ 	int retval = 0;
+@@ -1049,6 +1193,11 @@ static int __init dwc_otg_driver_init(void)
+ 	error = driver_create_file(&dwc_otg_driver.driver,
+                                    &driver_attr_debuglevel);
+ #endif
++
++#ifdef SOF_FIX
++        retval = init_proc_fs();
++#endif
++
+ 	return retval;
+ }
+ 
+diff --git a/drivers/usb/host/dwc_otg/dwc_otg_hcd.c b/drivers/usb/host/dwc_otg/dwc_otg_hcd.c
+index f07bb72..b532591 100644
+--- a/drivers/usb/host/dwc_otg/dwc_otg_hcd.c
++++ b/drivers/usb/host/dwc_otg/dwc_otg_hcd.c
+@@ -64,6 +64,37 @@ void dwc_otg_hcd_connect_timeout(void *ptr)
+ 	__DWC_ERROR("Device Not Connected/Responding\n");
+ }
+ 
++/**
++ * SOF_FIX: Reduce the SOF overhead by disabling the SOF interrupt except
++ *          when there are USB transfers pending.  Re-enable the interrupt
++ *          every tick for periodic transaction handling.  MSO 5/31/12
++ * SOF (Start of Frame) timeout function.  Kick the driver by re-enabling
++ * the SOF interrupt
++ */
++#ifdef SOF_FIX
++void dwc_otg_hcd_sof_timeout(void *ptr)
++{
++	dwc_otg_hcd_t * hcd = (dwc_otg_hcd_t *)ptr;
++	dwc_otg_core_if_t *core_if = hcd->core_if;
++	gintmsk_data_t gintmsk = {.d32 = 0};
++	dwc_otg_core_global_regs_t *global_regs = core_if->core_global_regs;
++	unsigned int intmsk;
++
++	// turn on Start-of-Frame interrupt
++	gintmsk.d32 = dwc_read_reg32(&global_regs->gintmsk);
++	intmsk = gintmsk.d32;
++	gintmsk.b.sofintr |= 1;
++	dwc_write_reg32(&global_regs->gintmsk, gintmsk.d32);
++	DWC_TIMER_SCHEDULE(hcd->sof_timer, 1);		/* 1ms */
++#ifdef DEBUG_SOF_FIX
++	if ((++sof_timeout_count % 10000) == 0)
++	    printk(KERN_ERR "%s: %d timeouts handled, read 0x%x wrote 0x%x.",
++		   __FUNCTION__, sof_timeout_count, intmsk, gintmsk.d32);
++#endif
++
++}
++#endif
++
+ #ifdef DEBUG
+ static void dump_channel_info(dwc_otg_hcd_t * hcd, dwc_otg_qh_t * qh)
+ {
+@@ -792,6 +823,13 @@ int dwc_otg_hcd_init(dwc_otg_hcd_t * hcd, dwc_otg_core_if_t * core_if)
+ 	hcd->conn_timer = DWC_TIMER_ALLOC("Connection timer",
+ 					  dwc_otg_hcd_connect_timeout, 0);
+ 
++#ifdef SOF_FIX
++	/* Initialize the Start of Frame interrupt timeout timer. */
++	hcd->sof_timer = DWC_TIMER_ALLOC("SOF timer",
++					  dwc_otg_hcd_sof_timeout, hcd);
++	DWC_TIMER_SCHEDULE(hcd->sof_timer, 1);		/* 1ms */
++#endif
++
+ 	/* Initialize reset tasklet. */
+ 	hcd->reset_tasklet = DWC_TASK_ALLOC(reset_tasklet_func, hcd);
+ 
+@@ -1307,6 +1345,11 @@ dwc_otg_transaction_type_e dwc_otg_hcd_select_transactions(dwc_otg_hcd_t * hcd)
+ 	dwc_otg_qh_t *qh;
+ 	int num_channels;
+ 	dwc_otg_transaction_type_e ret_val = DWC_OTG_TRANSACTION_NONE;
++#ifdef SOF_FIX
++	dwc_otg_core_if_t *core_if = hcd->core_if;
++	gintmsk_data_t gintmsk = {.d32 = 0};
++	dwc_otg_core_global_regs_t *global_regs = core_if->core_global_regs;
++#endif
+ 
+ #ifdef DEBUG_SOF
+ 	DWC_DEBUGPL(DBG_HCD, "  Select Transactions\n");
+@@ -1346,6 +1389,19 @@ dwc_otg_transaction_type_e dwc_otg_hcd_select_transactions(dwc_otg_hcd_t * hcd)
+ 		}
+ #endif
+ 	}
++#ifdef SOF_FIX
++	/*
++	 * If there are transactions queued then enable the SOF interrupt to send them to
++	 *  the controller.
++	 */
++	if (ret_val != DWC_OTG_TRANSACTION_NONE)
++	{
++		// turn on Start-of-Frame interrupt
++		gintmsk.d32 = dwc_read_reg32(&global_regs->gintmsk);
++		gintmsk.b.sofintr |= 1;
++		dwc_write_reg32(&global_regs->gintmsk, gintmsk.d32);
++	}
++#endif
+ 
+ 	/*
+ 	 * Process entries in the inactive portion of the non-periodic
+diff --git a/drivers/usb/host/dwc_otg/dwc_otg_hcd.h b/drivers/usb/host/dwc_otg/dwc_otg_hcd.h
+index f6e7870..66e219d 100644
+--- a/drivers/usb/host/dwc_otg/dwc_otg_hcd.h
++++ b/drivers/usb/host/dwc_otg/dwc_otg_hcd.h
+@@ -569,6 +569,15 @@ struct dwc_otg_hcd {
+ 	uint32_t hfnum_other_samples_b;
+ 	uint64_t hfnum_other_frrem_accum_b;
+ #endif
++#ifdef SOF_FIX
++	/**
++	 * SOF wakeup timer. We disable the SOF interrupt if there is nothing
++	 *  to do.  However, that eventually gets us into trouble.  So, re-enable 
++	 *  the SOF interrupt every tick so we can handle any backlog that does
++	 *  not trigger any other interrupt.
++	 */
++	dwc_timer_t *sof_timer;
++#endif
+ };
+ 
+ /** @name Transaction Execution Functions */
+diff --git a/drivers/usb/host/dwc_otg/dwc_otg_hcd_intr.c b/drivers/usb/host/dwc_otg/dwc_otg_hcd_intr.c
+index 86fee99..9758c92 100644
+--- a/drivers/usb/host/dwc_otg/dwc_otg_hcd_intr.c
++++ b/drivers/usb/host/dwc_otg/dwc_otg_hcd_intr.c
+@@ -32,6 +32,8 @@
+  * ========================================================================== */
+ #ifndef DWC_DEVICE_ONLY
+ 
++#include <linux/kernel.h>
++#include <linux/module.h>
+ #include "dwc_otg_hcd.h"
+ #include "dwc_otg_regs.h"
+ 
+@@ -39,6 +41,19 @@
+  * This file contains the implementation of the HCD Interrupt handlers.
+  */
+ 
++/**
++ * SOF_FIX: Reduce SOF interrupt handling by disabling the SOF interrupt except
++ *          when there are actual USB transfers pending.  MSO 5/31/12
++ */
++#ifdef SOF_FIX
++ extern   int  sof_setting(void);
++ unsigned int  g_dwc_otg_hcd_handle_intr_count = 0;
++ #ifdef DEBUG_SOF_FIX
++  unsigned int  g_dwc_otg_interrupt_counts[10] = {0,0,0,0,0,0,0,0,0,0};
++  extern int    g_softintr_ref_cnt;
++ #endif
++#endif
++
+ /** This function handles interrupts for the HCD. */
+ int32_t dwc_otg_hcd_handle_intr(dwc_otg_hcd_t * dwc_otg_hcd)
+ {
+@@ -46,9 +61,12 @@ int32_t dwc_otg_hcd_handle_intr(dwc_otg_hcd_t * dwc_otg_hcd)
+ 
+ 	dwc_otg_core_if_t *core_if = dwc_otg_hcd->core_if;
+ 	gintsts_data_t gintsts;
+-#ifdef DEBUG
++#ifdef SOF_FIX
+ 	dwc_otg_core_global_regs_t *global_regs = core_if->core_global_regs;
++	gintmsk_data_t gintmsk;
++#endif
+ 
++#ifdef DEBUG
+         //GRAYG: debugging
+         if (NULL == global_regs) {
+                 DWC_DEBUGPL(DBG_HCD, "**** NULL regs: dwc_otg_hcd=%p "
+@@ -57,7 +75,9 @@ int32_t dwc_otg_hcd_handle_intr(dwc_otg_hcd_t * dwc_otg_hcd)
+                 return retval;
+         }
+ #endif
+-
++#ifdef SOF_FIX
++        g_dwc_otg_hcd_handle_intr_count++;
++#endif
+ 	/* Check if HOST Mode */
+ 	if (dwc_otg_is_host_mode(core_if)) {
+ 		gintsts.d32 = dwc_otg_read_core_intr(core_if);
+@@ -81,29 +101,64 @@ int32_t dwc_otg_hcd_handle_intr(dwc_otg_hcd_t * dwc_otg_hcd)
+ 				    gintsts.d32, core_if);
+ #endif
+ 
+-		if (gintsts.b.sofintr) {
++		/*
++		 * If SOF handle it.  If not, it probably means that there is work to do,
++		 *  so enable SOF for the next micro-frame.
++		 */
++		if (gintsts.b.sofintr)
++		{
++#ifdef DEBUG_SOF_FIX
++			g_dwc_otg_interrupt_counts[0]++;
++#endif
+ 			retval |= dwc_otg_hcd_handle_sof_intr(dwc_otg_hcd);
+ 		}
++#ifdef SOF_FIX
++		else
++		{
++			// turn on Start-of-Frame interrupt
++			gintmsk.d32 = dwc_read_reg32(&global_regs->gintmsk);
++			gintmsk.b.sofintr |= 1;
++			dwc_write_reg32(&global_regs->gintmsk, gintmsk.d32);
++		}
++#endif
+ 		if (gintsts.b.rxstsqlvl) {
++#ifdef DEBUG_SOF_FIX
++			g_dwc_otg_interrupt_counts[1]++;
++#endif
+ 			retval |=
+ 			    dwc_otg_hcd_handle_rx_status_q_level_intr
+ 			    (dwc_otg_hcd);
+ 		}
+ 		if (gintsts.b.nptxfempty) {
++#ifdef DEBUG_SOF_FIX
++			g_dwc_otg_interrupt_counts[2]++;
++#endif
+ 			retval |=
+ 			    dwc_otg_hcd_handle_np_tx_fifo_empty_intr
+ 			    (dwc_otg_hcd);
+ 		}
+ 		if (gintsts.b.i2cintr) {
++#ifdef DEBUG_SOF_FIX
++			g_dwc_otg_interrupt_counts[3]++;
++#endif
+ 			/** @todo Implement i2cintr handler. */
+ 		}
+ 		if (gintsts.b.portintr) {
++#ifdef DEBUG_SOF_FIX
++			g_dwc_otg_interrupt_counts[4]++;
++#endif
+ 			retval |= dwc_otg_hcd_handle_port_intr(dwc_otg_hcd);
+ 		}
+ 		if (gintsts.b.hcintr) {
++#ifdef DEBUG_SOF_FIX
++			g_dwc_otg_interrupt_counts[5]++;
++#endif
+ 			retval |= dwc_otg_hcd_handle_hc_intr(dwc_otg_hcd);
+ 		}
+ 		if (gintsts.b.ptxfempty) {
++#ifdef DEBUG_SOF_FIX
++			g_dwc_otg_interrupt_counts[6]++;
++#endif
+ 			retval |=
+ 			    dwc_otg_hcd_handle_perio_tx_fifo_empty_intr
+ 			    (dwc_otg_hcd);
+@@ -130,7 +185,21 @@ int32_t dwc_otg_hcd_handle_intr(dwc_otg_hcd_t * dwc_otg_hcd)
+ #endif
+ 
+ 	}
+-
++#if defined(SOF_FIX) && defined(DEBUG_SOF_FIX)
++        if ((g_dwc_otg_hcd_handle_intr_count % 80000) == 0)
++	{
++		printk(KERN_ERR "dwc_otg_hcd_handle_intr: %u handled, %u, %u, %u, %u, %u, %u, %u, %u.\n",
++			g_dwc_otg_hcd_handle_intr_count,
++			g_dwc_otg_interrupt_counts[0],
++			g_dwc_otg_interrupt_counts[1],
++			g_dwc_otg_interrupt_counts[2],
++			g_dwc_otg_interrupt_counts[3],
++			g_dwc_otg_interrupt_counts[4],
++			g_dwc_otg_interrupt_counts[5],
++			g_dwc_otg_interrupt_counts[6],
++			g_dwc_otg_interrupt_counts[7]);
++	}
++#endif
+ 	return retval;
+ }
+ 
+@@ -174,6 +243,10 @@ static inline void track_missed_sofs(uint16_t curr_frame_number)
+  * (micro)frame. Periodic transactions may be queued to the controller for the
+  * next (micro)frame.
+  */
++#ifdef SOF_FIX
++#define SOF_INTR_DELAY_COUNT	3
++static int g_sof_intr_delay_count = SOF_INTR_DELAY_COUNT;
++#endif
+ int32_t dwc_otg_hcd_handle_sof_intr(dwc_otg_hcd_t * hcd)
+ {
+ 	hfnum_data_t hfnum;
+@@ -181,6 +254,11 @@ int32_t dwc_otg_hcd_handle_sof_intr(dwc_otg_hcd_t * hcd)
+ 	dwc_otg_qh_t *qh;
+ 	dwc_otg_transaction_type_e tr_type;
+ 	gintsts_data_t gintsts = {.d32 = 0 };
++#ifdef SOF_FIX
++	dwc_otg_core_if_t *core_if = hcd->core_if;
++	gintmsk_data_t gintmsk = {.d32 = 0 };
++	dwc_otg_core_global_regs_t *global_regs = core_if->core_global_regs;
++#endif
+ 
+ 	hfnum.d32 =
+ 	    dwc_read_reg32(&hcd->core_if->host_if->host_global_regs->hfnum);
+@@ -213,9 +291,24 @@ int32_t dwc_otg_hcd_handle_sof_intr(dwc_otg_hcd_t * hcd)
+ 		}
+ 	}
+ 	tr_type = dwc_otg_hcd_select_transactions(hcd);
+-	if (tr_type != DWC_OTG_TRANSACTION_NONE) {
++	if (tr_type != DWC_OTG_TRANSACTION_NONE)
++	{
+ 		dwc_otg_hcd_queue_transactions(hcd, tr_type);
+ 	}
++#ifdef SOF_FIX
++	else
++	{
++		// turn off Start-of-Frame interrupt
++		if ((sof_setting()) &&
++		    (g_sof_intr_delay_count-- == 0))
++		{
++			gintmsk.d32 = dwc_read_reg32(&global_regs->gintmsk);
++			gintmsk.b.sofintr &= 0;
++			dwc_write_reg32(&global_regs->gintmsk, gintmsk.d32);
++			g_sof_intr_delay_count = SOF_INTR_DELAY_COUNT;
++		}
++	}
++#endif
+ 
+ 	/* Clear interrupt */
+ 	gintsts.b.sofintr = 1;
+diff --git a/drivers/usb/host/dwc_otg/dwc_otg_hcd_linux.c b/drivers/usb/host/dwc_otg/dwc_otg_hcd_linux.c
+index 05fd421..6a89b1e 100644
+--- a/drivers/usb/host/dwc_otg/dwc_otg_hcd_linux.c
++++ b/drivers/usb/host/dwc_otg/dwc_otg_hcd_linux.c
+@@ -260,10 +260,19 @@ static void free_bus_bandwidth(struct usb_hcd *hcd, uint32_t bw,
+  * Sets the final status of an URB and returns it to the device driver. Any
+  * required cleanup of the URB is performed.
+  */
++#ifdef DEBUG_SOF_FIX
++extern unsigned int g_dwc_otg_interrupt_counts[10];
++#endif
++
+ static int _complete(dwc_otg_hcd_t * hcd, void *urb_handle,
+ 		     dwc_otg_hcd_urb_t * dwc_otg_urb, int32_t status)
+ {
+ 	struct urb *urb = (struct urb *)urb_handle;
++
++#ifdef DEBUG_SOF_FIX
++	g_dwc_otg_interrupt_counts[7]++;
++#endif
++
+ #ifdef DEBUG
+ 	if (CHK_DEBUG_LEVEL(DBG_HCDV | DBG_HCD_URB)) {
+ 		DWC_PRINTF("%s: urb %p, device %d, ep %d %s, status=%d\n",
+@@ -810,6 +819,10 @@ static void endpoint_disable(struct usb_hcd *hcd, struct usb_host_endpoint *ep)
+  * interrupt.
+  *
+  * This function is called by the USB core when an interrupt occurs */
++
++#ifdef DEBUG_SOF_FIX
++unsigned int g_dwc_otg_hcd_irq_count = 0;
++#endif
+ static irqreturn_t dwc_otg_hcd_irq(struct usb_hcd *hcd)
+ {
+ 	dwc_otg_hcd_t *dwc_otg_hcd = hcd_to_dwc_otg_hcd(hcd);
+@@ -817,6 +830,12 @@ static irqreturn_t dwc_otg_hcd_irq(struct usb_hcd *hcd)
+ 	if (retval != 0) {
+ 		S3C2410X_CLEAR_EINTPEND();
+ 	}
++
++#ifdef DEBUG_SOF_FIX
++	++g_dwc_otg_hcd_irq_count;
++	if ((++g_dwc_otg_hcd_irq_count %10000) == 0)
++		printk(KERN_ERR "dwc_otg_hcd_irq: %u completions.\n", g_dwc_otg_hcd_irq_count);
++#endif
+ 	return IRQ_RETVAL(retval);
+ }
+ 
