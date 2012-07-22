@@ -1,0 +1,93 @@
+From f3320b75d0d51c9cca8df24369e34b664b235b7d Mon Sep 17 00:00:00 2001
+From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+Date: Thu, 15 Sep 2011 17:50:38 +0200
+Subject: [PATCH] mmc: core: Set correct bus mode before card init
+
+Earlier all cards where initiated with bus mode set as OPENDRAIN, and then
+later switched to PUSHPULL. According to the MMC/SD/SDIO specifications
+only MMC cards use OPENDRAIN during init. For both SD and SDIO the bus
+mode shall be PUSHPULL before attempting to init the card.
+
+The consequence of having incorrect bus mode can lead to not being able
+to detect the card. Therefore the default behavior have now been changed
+to PUSHPULL in mmc_power_up, and will only be temporarily switched when
+trying to attach or init a MMC card.
+
+Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+Signed-off-by: Ulf HANSSON <ulf.hansson@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Chris Ball <cjb@laptop.org>
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index a14ddf96..04a141f 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1123,13 +1123,11 @@ static void mmc_power_up(struct mmc_host *host)
+ 		bit = fls(host->ocr_avail) - 1;
+ 
+ 	host->ios.vdd = bit;
+-	if (mmc_host_is_spi(host)) {
++	if (mmc_host_is_spi(host))
+ 		host->ios.chip_select = MMC_CS_HIGH;
+-		host->ios.bus_mode = MMC_BUSMODE_PUSHPULL;
+-	} else {
++	else
+ 		host->ios.chip_select = MMC_CS_DONTCARE;
+-		host->ios.bus_mode = MMC_BUSMODE_OPENDRAIN;
+-	}
++	host->ios.bus_mode = MMC_BUSMODE_PUSHPULL;
+ 	host->ios.power_mode = MMC_POWER_UP;
+ 	host->ios.bus_width = MMC_BUS_WIDTH_1;
+ 	host->ios.timing = MMC_TIMING_LEGACY;
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index 6952f77..89bb40d 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -550,6 +550,10 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+ 	BUG_ON(!host);
+ 	WARN_ON(!host->claimed);
+ 
++	/* Set correct bus mode for MMC before attempting init */
++	if (!mmc_host_is_spi(host))
++		mmc_set_bus_mode(host, MMC_BUSMODE_OPENDRAIN);
++
+ 	/*
+ 	 * Since we're changing the OCR value, we seem to
+ 	 * need to tell some cards to go back to the idle
+@@ -1019,6 +1023,10 @@ int mmc_attach_mmc(struct mmc_host *host)
+ 	BUG_ON(!host);
+ 	WARN_ON(!host->claimed);
+ 
++	/* Set correct bus mode for MMC before attempting attach */
++	if (!mmc_host_is_spi(host))
++		mmc_set_bus_mode(host, MMC_BUSMODE_OPENDRAIN);
++
+ 	err = mmc_send_op_cond(host, 0, &ocr);
+ 	if (err)
+ 		return err;
+diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+index c813ee3..fd55228 100644
+--- a/drivers/mmc/core/sd.c
++++ b/drivers/mmc/core/sd.c
+@@ -929,8 +929,6 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
+ 		err = mmc_send_relative_addr(host, &card->rca);
+ 		if (err)
+ 			return err;
+-
+-		mmc_set_bus_mode(host, MMC_BUSMODE_PUSHPULL);
+ 	}
+ 
+ 	if (!oldcard) {
+diff --git a/drivers/mmc/core/sdio.c b/drivers/mmc/core/sdio.c
+index ac492ac..698d813 100644
+--- a/drivers/mmc/core/sdio.c
++++ b/drivers/mmc/core/sdio.c
+@@ -408,8 +408,6 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
+ 		 */
+ 		if (oldcard)
+ 			oldcard->rca = card->rca;
+-
+-		mmc_set_bus_mode(host, MMC_BUSMODE_PUSHPULL);
+ 	}
+ 
+ 	/*

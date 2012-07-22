@@ -1,0 +1,85 @@
+From e4f6da232f57a77388881a9c6f5fd3e6f3d2708d Mon Sep 17 00:00:00 2001
+From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+Date: Thu, 3 Nov 2011 09:44:12 +0100
+Subject: [PATCH] mmc: core: Add quirk for long data read time
+
+Adds a quirk that sets the data read timeout to a fixed value instead
+of relying on the information in the CSD. The timeout value chosen
+is 300ms since that has proven enough for the problematic cards found,
+but could be increased if other cards require this.
+
+This patch also enables this quirk for certain Micron cards known to
+have this problem.
+
+Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: <stable@kernel.org>
+Signed-off-by: Chris Ball <cjb@laptop.org>
+
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 4c1a648..d62f4cd 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -1492,6 +1492,14 @@ static const struct mmc_fixup blk_fixups[] =
+ 		  MMC_QUIRK_BLK_NO_CMD23),
+ 	MMC_FIXUP("MMC32G", 0x11, CID_OEMID_ANY, add_quirk_mmc,
+ 		  MMC_QUIRK_BLK_NO_CMD23),
++
++	/*
++	 * Some Micron MMC cards needs longer data read timeout than
++	 * indicated in CSD.
++	 */
++	MMC_FIXUP(CID_NAME_ANY, 0x13, 0x200, add_quirk_mmc,
++		  MMC_QUIRK_LONG_READ_TIME),
++
+ 	END_FIXUP
+ };
+ 
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 04a141f..f5d2890 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -415,6 +415,18 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
+ 			data->timeout_clks = 0;
+ 		}
+ 	}
++
++	/*
++	 * Some cards require longer data read timeout than indicated in CSD.
++	 * Address this by setting the read timeout to a "reasonably high"
++	 * value. For the cards tested, 300ms has proven enough. If necessary,
++	 * this value can be increased if other problematic cards require this.
++	 */
++	if (mmc_card_long_read_time(card) && data->flags & MMC_DATA_READ) {
++		data->timeout_ns = 300000000;
++		data->timeout_clks = 0;
++	}
++
+ 	/*
+ 	 * Some cards need very high timeouts if driven in SPI mode.
+ 	 * The worst observed timeout was 900ms after writing a
+diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+index b460fc2..97c4740 100644
+--- a/include/linux/mmc/card.h
++++ b/include/linux/mmc/card.h
+@@ -188,6 +188,7 @@ struct mmc_card {
+ #define MMC_QUIRK_DISABLE_CD	(1<<5)		/* disconnect CD/DAT[3] resistor */
+ #define MMC_QUIRK_INAND_CMD38	(1<<6)		/* iNAND devices have broken CMD38 */
+ #define MMC_QUIRK_BLK_NO_CMD23	(1<<7)		/* Avoid CMD23 for regular multiblock */
++#define MMC_QUIRK_LONG_READ_TIME (1<<9)		/* Data read time > CSD says */
+ 
+ 	unsigned int		erase_size;	/* erase size in sectors */
+  	unsigned int		erase_shift;	/* if erase unit is power 2 */
+@@ -377,6 +378,11 @@ static inline int mmc_card_nonstd_func_interface(const struct mmc_card *c)
+ 	return c->quirks & MMC_QUIRK_NONSTD_FUNC_IF;
+ }
+ 
++static inline int mmc_card_long_read_time(const struct mmc_card *c)
++{
++	return c->quirks & MMC_QUIRK_LONG_READ_TIME;
++}
++
+ #define mmc_card_name(c)	((c)->cid.prod_name)
+ #define mmc_card_id(c)		(dev_name(&(c)->dev))
+ 
