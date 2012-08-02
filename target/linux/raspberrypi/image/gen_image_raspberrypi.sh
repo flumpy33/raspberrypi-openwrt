@@ -20,8 +20,8 @@ ROOTFSIMAGE="$5"
 
 rm -f "$OUTPUT"
 
-head=16
-sect=63
+head=4
+sect=16
 blksize=512
 
 # create partition table

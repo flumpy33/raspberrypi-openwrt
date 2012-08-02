@@ -10,7 +10,7 @@ ARCH:=arm
 BOARD:=raspberrypi
 BOARDNAME:=Raspberry Pi
 FEATURES:=fpu ext4 targz usb audio
-CFLAGS:=-O2 -pipe -mcpu=arm1176jzf-s -fno-caller-saves
+CFLAGS:=-O2 -pipe -march=armv6 -mtune=arm1176jzf-s -mfpu=vfp -mfloat-abi=softfp -marm
 MAINTAINER:=Nathan Huizinga <nathan.huizinga@gmail.com>
 
 LINUX_VERSION:=3.1.9
@@ -21,6 +21,6 @@ define Target/Description
 	Build images for Raspberry Pi (Model B) boards.
 endef
 
-KERNELNAME:="zImage"
+KERNELNAME:="Image"
 
 $(eval $(call BuildTarget))
