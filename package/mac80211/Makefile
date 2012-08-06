@@ -10,10 +10,10 @@ include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=mac80211
 
-PKG_VERSION:=2012-02-06
-PKG_RELEASE:=2
+PKG_VERSION:=2012-07-16
+PKG_RELEASE:=1
 PKG_SOURCE_URL:=http://mirror2.openwrt.org/sources
-PKG_MD5SUM:=fae71c35ee3f3de6329f2db7aed6d265
+PKG_MD5SUM:=8e41a935ad147631b78f99eda7187c1f
 
 PKG_SOURCE:=compat-wireless-$(PKG_VERSION).tar.bz2
 PKG_BUILD_DIR:=$(KERNEL_BUILD_DIR)/compat-wireless-$(PKG_VERSION)
@@ -55,7 +55,7 @@ endef
 define KernelPackage/cfg80211
   $(call KernelPackage/mac80211/Default)
   TITLE:=cfg80211 - wireless configuration API
-  DEPENDS+= +wireless-tools +iw +crda
+  DEPENDS+= +wireless-tools +iw
   FILES:= \
 	$(PKG_BUILD_DIR)/compat/compat.ko \
 	$(PKG_BUILD_DIR)/net/wireless/cfg80211.ko
@@ -102,11 +102,11 @@ Generic IEEE 802.11 Networking Stack (mac80211)
 endef
 
 PKG_LINUX_FIRMWARE_NAME:=linux-firmware
-PKG_LINUX_FIRMWARE_VERSION:=d543c1d98fc240267ee59fff93f7a0f36d9e2fc3
+PKG_LINUX_FIRMWARE_VERSION:=375e9548bf75a5664256d47a2f9e14b79181e02d
 PKG_LINUX_FIRMWARE_SOURCE:=$(PKG_LINUX_FIRMWARE_NAME)-$(PKG_LINUX_FIRMWARE_VERSION).tar.bz2
 PKG_LINUX_FIRMWARE_PROTO:=git
-# PKG_LINUX_FIRMWARE_SOURCE_URL:=git://git.kernel.org/pub/scm/linux/kernel/git/dwmw2/linux-firmware.git
-PKG_LINUX_FIRMWARE_SOURCE_URL:=git://git.infradead.org/users/dwmw2/linux-firmware.git
+# PKG_LINUX_FIRMWARE_SOURCE_URL:=git://git.infradead.org/users/dwmw2/linux-firmware.git
+PKG_LINUX_FIRMWARE_SOURCE_URL:=git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
 PKG_LINUX_FIRMWARE_SUBDIR:=$(PKG_LINUX_FIRMWARE_NAME)-$(PKG_LINUX_FIRMWARE_VERSION)
 
 define Download/linux-firmware
@@ -389,7 +389,7 @@ endef
 define KernelPackage/ath
   $(call KernelPackage/mac80211/Default)
   TITLE:=Atheros common driver part
-  DEPENDS+= @PCI_SUPPORT||USB_SUPPORT||TARGET_ar71xx +kmod-mac80211
+  DEPENDS+= @PCI_SUPPORT||USB_SUPPORT||TARGET_ar71xx||TARGET_atheros +kmod-mac80211
   FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/ath/ath.ko
   AUTOLOAD:=$(call AutoLoad,26,ath)
   MENU:=1
@@ -475,7 +475,7 @@ define KernelPackage/lib80211
 	$(PKG_BUILD_DIR)/net/wireless/lib80211_crypt_wep.ko \
 	$(PKG_BUILD_DIR)/net/wireless/lib80211_crypt_ccmp.ko \
 	$(PKG_BUILD_DIR)/net/wireless/lib80211_crypt_tkip.ko
-  AUTOLOAD:=$(call AutoLoad,10, \
+  AUTOLOAD:=$(call AutoLoad,21, \
 	lib80211 \
 	lib80211_crypt_wep \
 	lib80211_crypt_ccmp \
@@ -762,9 +762,10 @@ define KernelPackage/wl12xx
   URL:=http://wireless.kernel.org/en/users/Drivers/wl12xx
   DEPENDS+= @TARGET_omap4 +kmod-mac80211
   FILES:= \
-	$(PKG_BUILD_DIR)/drivers/net/wireless/wl12xx/wl12xx.ko \
-	$(PKG_BUILD_DIR)/drivers/net/wireless/wl12xx/wl12xx_sdio.ko
-  AUTOLOAD:=$(call AutoLoad,61,wl12xx wl12xx_sdio)
+	$(PKG_BUILD_DIR)/drivers/net/wireless/ti/wl12xx/wl12xx.ko \
+	$(PKG_BUILD_DIR)/drivers/net/wireless/ti/wlcore/wlcore.ko \
+	$(PKG_BUILD_DIR)/drivers/net/wireless/ti/wlcore/wlcore_sdio.ko
+  AUTOLOAD:=$(call AutoLoad,61,wlcore wlcore_sdio wl12xx)
 endef
 
 define KernelPackage/wl12xx/description
@@ -888,12 +889,12 @@ define KernelPackage/b43/config
 
 	choice
 		prompt "b43 firmware version"
-		default B43_FW_5_10
+		default B43_FW_5_100_138
 		help
 		  This option allows you to select the version of the b43 firmware.
 
 	config B43_FW_4_150
-		bool "Firmware 410.2160 from driver 4.150.10.5 (stable)"
+		bool "Firmware 410.2160 from driver 4.150.10.5 (old stable)"
 		help
 		  Stable firmware for BCM43xx devices.
 
@@ -918,7 +919,7 @@ define KernelPackage/b43/config
 		  If unsure, select the "stable" firmware.
    
 	config B43_FW_5_100_138
-		bool "Firmware 666.2 from driver 5.100.138"
+		bool "Firmware 666.2 from driver 5.100.138 (stable)"
 		help
 		  Newer experimental firmware for BCM43xx devices.
 
@@ -1003,7 +1004,6 @@ define KernelPackage/b43/config
 
 	config PACKAGE_B43_PHY_N
 		bool "Enable support for N-PHYs"
-		select B43_FW_5_100_138
 		default y
 		help
 		  Enable support for BCM4321 and BCM4322.
@@ -1014,7 +1014,6 @@ define KernelPackage/b43/config
 
 	config PACKAGE_B43_PHY_HT
 		bool "Enable support for HT-PHYs"
-		select B43_FW_5_100_138
 		default n
 		help
 		  Currently broken.
@@ -1024,7 +1023,6 @@ define KernelPackage/b43/config
 	config PACKAGE_B43_PHY_LCN
 		bool "Enable support for LCN-PHYs"
 		depends on BROKEN
-		select B43_FW_5_100_138
 		default n
 		help
 		  Currently broken.
@@ -1080,8 +1078,62 @@ define KernelPackage/b43legacy/description
 Kernel module for Broadcom 43xx-legacy wireless support (mac80211 stack) new
 endef
 
+
+define KernelPackage/brcmutil
+  $(call KernelPackage/mac80211/Default)
+  TITLE:=Broadcom IEEE802.11n common driver parts
+  URL:=http://linuxwireless.org/en/users/Drivers/brcm80211
+  DEPENDS+=@PCI_SUPPORT||USB_SUPPORT
+  FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/brcm80211/brcmutil/brcmutil.ko
+  AUTOLOAD:=$(call AutoLoad,30,brcmutil)
+  MENU:=1
+endef
+
+define KernelPackage/brcmutil/description
+ This module contains some common parts needed by Broadcom Wireless drivers brcmsmac and brcmfmac.
+endef
+
+define KernelPackage/brcmutil/config
+	menu "Configuration"
+		depends on PACKAGE_kmod-brcmutil
+
+	config PACKAGE_BRCM80211_DEBUG
+		bool "Broadcom wireless driver debugging"
+		help
+		  Say Y, if you want to debug brcmsmac and brcmfmac wireless driver.
+
+	endmenu
+endef
+
+define KernelPackage/brcmsmac
+  $(call KernelPackage/mac80211/Default)
+  TITLE:=Broadcom IEEE802.11n PCIe SoftMAC WLAN driver
+  URL:=http://linuxwireless.org/en/users/Drivers/brcm80211
+  DEPENDS+= +kmod-mac80211 +@DRIVER_11N_SUPPORT +!TARGET_brcm47xx:kmod-bcma +kmod-lib-cordic +kmod-lib-crc8 +kmod-brcmutil
+  FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/brcm80211/brcmsmac/brcmsmac.ko
+  AUTOLOAD:=$(call AutoLoad,31,brcmsmac)
+endef
+
+define KernelPackage/brcmsmac/description
+ Kernel module for Broadcom IEEE802.11n PCIe Wireless cards
+endef
+
+define KernelPackage/brcmfmac
+  $(call KernelPackage/mac80211/Default)
+  TITLE:=Broadcom IEEE802.11n USB FullMAC WLAN driver
+  URL:=http://linuxwireless.org/en/users/Drivers/brcm80211
+  DEPENDS+= @USB_SUPPORT +kmod-usb-core +kmod-cfg80211 +@DRIVER_11N_SUPPORT +kmod-brcmutil
+  FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.ko
+  AUTOLOAD:=$(call AutoLoad,60,brcmfmac)
+endef
+
+define KernelPackage/brcmfmac/description
+ Kernel module for Broadcom IEEE802.11n USB Wireless cards
+endef
+
 BUILDFLAGS:= \
 	-I$(PKG_BUILD_DIR)/include \
+	-DCONFIG_CFG80211_INTERNAL_REGDB=y \
 	$(foreach opt,$(CONFOPTS),-DCONFIG_$(opt)) \
 	$(if $(CONFIG_PCI),-DCONFIG_B43_PCI_AUTOSELECT -DCONFIG_B43_PCICORE_AUTOSELECT) \
 	$(if $(CONFIG_LEDS_TRIGGERS), -DCONFIG_MAC80211_LEDS -DCONFIG_LEDS_TRIGGERS -DCONFIG_B43_LEDS -DCONFIG_B43LEGACY_LEDS) \
@@ -1116,13 +1168,16 @@ BUILDFLAGS:= \
 	$(if $(CONFIG_TARGET_atheros),-DCONFIG_ATH5K_AHB,-DCONFIG_ATH5K_PCI) \
 	$(if $(CONFIG_PACKAGE_kmod-iwl3945),-DCONFIG_IWL3945) \
 	$(if $(CONFIG_PACKAGE_kmod-iwl4965),-DCONFIG_COMPAT_IWL4965) \
-	$(if $(CONFIG_PACKAGE_kmod-wl12xx),-DCONFIG_WL12XX -DCONFIG_COMPAT_WL12XX_SDIO)
+	$(if $(CONFIG_PACKAGE_kmod-wl12xx),-DCONFIG_WL12XX -DCONFIG_COMPAT_WL12XX_SDIO) \
+	$(if $(CONFIG_PACKAGE_BRCM80211_DEBUG),-DCONFIG_BRCMDBG) \
+	$(if $(CONFIG_PACKAGE_kmod-brcmfmac),-DCONFIG_BRCMFMAC_USB)
 
 MAKE_OPTS:= \
 	CROSS_COMPILE="$(KERNEL_CROSS)" \
 	ARCH="$(LINUX_KARCH)" \
 	EXTRA_CFLAGS="$(BUILDFLAGS)" \
 	$(foreach opt,$(CONFOPTS),CONFIG_$(opt)=m) \
+	CONFIG_CFG80211_INTERNAL_REGDB=y \
 	CONFIG_CFG80211=$(if $(CONFIG_PACKAGE_kmod-cfg80211),m) \
 	CONFIG_MAC80211=$(if $(CONFIG_PACKAGE_kmod-mac80211),m) \
 	CONFIG_MAC80211_RC_MINSTREL=y \
@@ -1222,8 +1277,10 @@ MAKE_OPTS:= \
 	CONFIG_USB_NET_CDCETHER= \
 	CONFIG_USB_USBNET= \
 	CONFIG_AT76C50X_USB= \
+	CONFIG_WL_TI=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
+	CONFIG_WLCORE=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
 	CONFIG_WL12XX=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
-	CONFIG_COMPAT_WL12XX_SDIO=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
+	CONFIG_WLCORE_SDIO=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
 	CONFIG_EEPROM_93CX6= \
 	CONFIG_HERMES=$(if $(CONFIG_PACKAGE_kmod-net-hermes),m) \
 	CONFIG_HERMES_CACHE_FW_ON_INIT= \
@@ -1246,9 +1303,11 @@ MAKE_OPTS:= \
 	CONFIG_ATL2= \
 	CONFIG_ATL1E= \
 	CONFIG_ATL1C= \
-	CONFIG_BRCMFMAC= \
-	CONFIG_BRCMUMAC= \
-	CONFIG_BRCMSMAC= \
+	CONFIG_BRCMUTIL=$(if $(CONFIG_PACKAGE_kmod-brcmutil),m) \
+	CONFIG_BRCMSMAC=$(if $(CONFIG_PACKAGE_kmod-brcmsmac),m) \
+	CONFIG_BRCMFMAC=$(if $(CONFIG_PACKAGE_kmod-brcmfmac),m) \
+	CONFIG_BRCMFMAC_USB=$(if $(CONFIG_PACKAGE_kmod-brcmfmac),y) \
+	CONFIG_BRCMDBG=$(if $(CONFIG_PACKAGE_BRCM80211_DEBUG),y) \
 	KLIB_BUILD="$(LINUX_DIR)" \
 	MODPROBE=true \
 	KLIB=$(TARGET_MODULES_DIR) \
@@ -1270,13 +1329,22 @@ define Build/Prepare
 	$(TAR) -C $(PKG_BUILD_DIR) -xjf $(DL_DIR)/$(PKG_LINUX_FIRMWARE_SOURCE)
 	rm -rf $(PKG_BUILD_DIR)/include/linux/ssb
 	rm -rf $(PKG_BUILD_DIR)/include/linux/bcma
+	rm -rf $(PKG_BUILD_DIR)/include/net/bluetooth/
+	rm -f $(PKG_BUILD_DIR)/include/linux/eeprom_93cx6.h
+	rm -f $(PKG_BUILD_DIR)/include/linux/ath9k_platform.h
+	rm -f $(PKG_BUILD_DIR)/include/linux/ath5k_platform.h
+	rm -f $(PKG_BUILD_DIR)/include/linux/rt2x00_platform.h
+	rm -f $(PKG_BUILD_DIR)/include/linux/wl12xx.h
+	rm -f $(PKG_BUILD_DIR)/include/linux/spi/libertas_spi.h
 	rm -f $(PKG_BUILD_DIR)/include/net/ieee80211.h
+	echo 'compat-wireless-$(PKG_VERSION)-$(PKG_RELEASE)-$(REVISION)' > $(PKG_BUILD_DIR)/compat_version
+	$(CP) ./files/regdb.txt $(PKG_BUILD_DIR)/net/wireless/db.txt
 endef
 
 ifneq ($(CONFIG_PACKAGE_kmod-cfg80211)$(CONFIG_PACKAGE_kmod-lib80211),)
  define Build/Compile/kmod
 	rm -rf $(PKG_BUILD_DIR)/modules
-	$(MAKE) $(PKG_JOBS) -C "$(PKG_BUILD_DIR)" $(MAKE_OPTS) all
+	$(MAKE) $(PKG_JOBS) -C "$(PKG_BUILD_DIR)" $(MAKE_OPTS) modules
  endef
 endif
 
@@ -1364,9 +1432,10 @@ endef
 define KernelPackage/wl12xx/install
 	$(INSTALL_DIR) $(1)/lib/firmware/ti-connectivity
 	$(INSTALL_DATA) \
-		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/ti-connectivity/wl127x-fw-3.bin \
-		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/ti-connectivity/wl127x-fw-plt-3.bin \
-		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/ti-connectivity/wl127x-nvs.bin \
+		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/ti-connectivity/wl127x-fw-4-mr.bin \
+		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/ti-connectivity/wl127x-fw-4-plt.bin \
+		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/ti-connectivity/wl127x-fw-4-sr.bin \
+		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/ti-connectivity/wl1271-nvs.bin \
 		$(1)/lib/firmware/ti-connectivity
 endef
 
@@ -1385,14 +1454,14 @@ define KernelPackage/ath9k-htc/install
 endef
 
 define KernelPackage/mwl8k/install
-	$(INSTALL_DIR) $(1)/lib/firmware
+	$(INSTALL_DIR) $(1)/lib/firmware/mwl8k
 	$(INSTALL_DATA) \
 		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/mwl8k/fmimage_8366_ap-2.fw \
 		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/mwl8k/fmimage_8366.fw \
 		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/mwl8k/helper_8366.fw \
 		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/mwl8k/fmimage_8687.fw \
 		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/mwl8k/helper_8687.fw \
-		$(1)/lib/firmware/
+		$(1)/lib/firmware/mwl8k/
 endef
 
 define KernelPackage/net-ipw2100/install
@@ -1492,6 +1561,21 @@ ifneq ($(CONFIG_B43LEGACY_FW_SQUASH),)
 endif
 endef
 
+define KernelPackage/brcmsmac/install
+	$(INSTALL_DIR) $(1)/lib/firmware/brcm
+	$(INSTALL_DATA) \
+		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/brcm/bcm43xx-0.fw \
+		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/brcm/bcm43xx_hdr-0.fw \
+		$(1)/lib/firmware/brcm/
+endef
+
+define KernelPackage/brcmfmac/install
+	$(INSTALL_DIR) $(1)/lib/firmware/brcm
+	$(INSTALL_DATA) \
+		$(PKG_BUILD_DIR)/$(PKG_LINUX_FIRMWARE_SUBDIR)/brcm/brcmfmac43236b.bin \
+		$(1)/lib/firmware/brcm/
+endef
+
 $(eval $(call KernelPackage,ath5k))
 $(eval $(call KernelPackage,lib80211))
 $(eval $(call KernelPackage,libertas-usb))
@@ -1525,6 +1609,9 @@ $(eval $(call KernelPackage,ath))
 $(eval $(call KernelPackage,carl9170))
 $(eval $(call KernelPackage,b43))
 $(eval $(call KernelPackage,b43legacy))
+$(eval $(call KernelPackage,brcmutil))
+$(eval $(call KernelPackage,brcmsmac))
+$(eval $(call KernelPackage,brcmfmac))
 $(eval $(call KernelPackage,net-libipw))
 $(eval $(call KernelPackage,net-ipw2100))
 $(eval $(call KernelPackage,net-ipw2200))

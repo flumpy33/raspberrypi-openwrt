@@ -134,7 +134,8 @@ static char * format_rate(int rate)
 	if (rate <= 0)
 		snprintf(buf, sizeof(buf), "unknown");
 	else
-		snprintf(buf, sizeof(buf), "%.1f MBit/s", ((float)rate / 1000.0));
+		snprintf(buf, sizeof(buf), "%d.%d MBit/s",
+			rate / 1000, (rate % 1000) / 100);
 
 	return buf;
 }
@@ -230,19 +231,19 @@ static char * format_encryption(struct iwinfo_crypto_entry *c)
 				case 3:
 					snprintf(buf, sizeof(buf), "mixed WPA/WPA2 %s (%s)",
 						format_enc_suites(c->auth_suites),
-						format_enc_ciphers(c->pair_ciphers & c->group_ciphers));
+						format_enc_ciphers(c->pair_ciphers | c->group_ciphers));
 					break;
 
 				case 2:
 					snprintf(buf, sizeof(buf), "WPA2 %s (%s)",
 						format_enc_suites(c->auth_suites),
-						format_enc_ciphers(c->pair_ciphers & c->group_ciphers));
+						format_enc_ciphers(c->pair_ciphers | c->group_ciphers));
 					break;
 
 				case 1:
 					snprintf(buf, sizeof(buf), "WPA %s (%s)",
 						format_enc_suites(c->auth_suites),
-						format_enc_ciphers(c->pair_ciphers & c->group_ciphers));
+						format_enc_ciphers(c->pair_ciphers | c->group_ciphers));
 					break;
 			}
 		}
@@ -271,6 +272,34 @@ static char * format_hwmodes(int modes)
 			(modes & IWINFO_80211_B) ? "b" : "",
 			(modes & IWINFO_80211_G) ? "g" : "",
 			(modes & IWINFO_80211_N) ? "n" : "");
+
+	return buf;
+}
+
+static char * format_assocrate(struct iwinfo_rate_entry *r)
+{
+	static char buf[40];
+	char *p = buf;
+	int l = sizeof(buf);
+
+	if (r->rate <= 0)
+	{
+		snprintf(buf, sizeof(buf), "unknown");
+	}
+	else
+	{
+		p += snprintf(p, l, "%s", format_rate(r->rate));
+		l = sizeof(buf) - (p - buf);
+
+		if (r->mcs >= 0)
+		{
+			p += snprintf(p, l, ", MCS %d, %dMHz", r->mcs, 20 + r->is_40mhz*20);
+			l = sizeof(buf) - (p - buf);
+
+			if (r->is_short_gi)
+				p += snprintf(p, l, ", short GI");
+		}
+	}
 
 	return buf;
 }
@@ -363,10 +392,13 @@ static char * print_bssid(const struct iwinfo_ops *iw, const char *ifname)
 
 static char * print_mode(const struct iwinfo_ops *iw, const char *ifname)
 {
+	int mode;
 	static char buf[128];
 
-	if (iw->mode(ifname, buf))
-		snprintf(buf, sizeof(buf), "unknown");
+	if (iw->mode(ifname, &mode))
+		mode = IWINFO_OPMODE_UNKNOWN;
+
+	snprintf(buf, sizeof(buf), "%s", IWINFO_OPMODE_NAMES[mode]);
 
 	return buf;
 }
@@ -544,7 +576,7 @@ static void print_scanlist(const struct iwinfo_ops *iw, const char *ifname)
 		printf("          ESSID: %s\n",
 			format_ssid(e->ssid));
 		printf("          Mode: %s  Channel: %s\n",
-			e->mode ? (char *)e->mode : "unknown",
+			IWINFO_OPMODE_NAMES[e->mode],
 			format_channel(e->channel));
 		printf("          Signal: %s  Quality: %s/%s\n",
 			format_signal(e->signal - 0x100),
@@ -635,11 +667,22 @@ static void print_assoclist(const struct iwinfo_ops *iw, const char *ifname)
 	{
 		e = (struct iwinfo_assoclist_entry *) &buf[i];
 
-		printf("%s  %s / %s (SNR %d)\n",
+		printf("%s  %s / %s (SNR %d)  %d ms ago\n",
 			format_bssid(e->mac),
 			format_signal(e->signal),
 			format_noise(e->noise),
-			(e->signal - e->noise));
+			(e->signal - e->noise),
+			e->inactive);
+
+		printf("	RX: %-38s  %8d Pkts.\n",
+			format_assocrate(&e->rx_rate),
+			e->rx_packets
+		);
+
+		printf("	TX: %-38s  %8d Pkts.\n\n",
+			format_assocrate(&e->tx_rate),
+			e->tx_packets
+		);
 	}
 }
 

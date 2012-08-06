@@ -24,10 +24,9 @@ define KernelPackage/pwm-atmel
   SUBMENU:=$(OTHER_MENU)
   TITLE:=PWM on atmel SoC
   DEPENDS:=@TARGET_at91
-  KCONFIG:=CONFIG_GENERIC_PWM \
-		CONFIG_ATMEL_PWM
-  FILES:=$(LINUX_DIR)/drivers/pwm/atmel-pwm.ko
-  AUTOLOAD:=$(call AutoLoad,51,atmel-pwm)
+  KCONFIG:=CONFIG_ATMEL_PWM
+  FILES:=$(LINUX_DIR)/drivers/misc/atmel_pwm.ko
+  AUTOLOAD:=$(call AutoLoad,51,atmel_pwm)
 endef
 
 define KernelPackage/pwm-atmel/description
@@ -50,3 +49,20 @@ define KernelPackage/at91-adc/description
 endef
 
 $(eval $(call KernelPackage,at91-adc))
+
+
+I2C_AT91_MODULES:=\
+  CONFIG_I2C_AT91:drivers/i2c/busses/i2c-at91
+
+define KernelPackage/at91-i2c
+  $(call i2c_defaults,$(I2C_AT91_MODULES),55)
+  TITLE:=I2C (TWI) master driver for Atmel AT91
+  DEPENDS:=@TARGET_at91 +kmod-i2c-core
+endef
+
+define KernelPackage/at91-i2c/description
+ Kernel module to use the I2C (TWI) master driver for Atmel AT91
+endef
+
+$(eval $(call KernelPackage,at91-i2c))
+

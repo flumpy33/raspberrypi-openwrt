@@ -12,18 +12,23 @@
 #define _RT3883_DEVICES_H
 
 struct physmap_flash_data;
+struct spi_board_info;
 
 extern struct physmap_flash_data rt3883_flash0_data;
 extern struct physmap_flash_data rt3883_flash1_data;
 void rt3883_register_pflash(unsigned int id);
 
-struct mtd_partition;
-void rt3883_register_nand(struct mtd_partition *parts, int nr_parts);
+extern struct ramips_nand_platform_data rt3883_nand_data;
+void rt3883_register_nand(void);
 
 extern struct ramips_eth_platform_data rt3883_eth_data;
 void rt3883_register_ethernet(void);
 void rt3883_register_usbhost(void);
+
+extern struct rt2x00_platform_data rt3883_wlan_data;
 void rt3883_register_wlan(void);
 void rt3883_register_wdt(bool enable_reset);
+
+void rt3883_register_spi(struct spi_board_info *info, int n);
 
 #endif  /* _RT3883_DEVICES_H */

@@ -115,6 +115,7 @@ sub gen_kconfig_overrides() {
 					$val = $2;
 				}
 				if ($config{"CONFIG_PACKAGE_$package"} and ($config ne 'n')) {
+					next if $kconfig{$config} eq 'y';
 					$kconfig{$config} = $val;
 				} elsif (!$override) {
 					$kconfig{$config} or $kconfig{$config} = 'n';
@@ -161,6 +162,7 @@ sub target_config_features(@) {
 		/usb/ and $ret .= "\tselect USB_SUPPORT\n";
 		/usbgadget/ and $ret .= "\tselect USB_GADGET_SUPPORT\n";
 		/pcmcia/ and $ret .= "\tselect PCMCIA_SUPPORT\n";
+		/rtc/ and $ret .= "\tselect RTC_SUPPORT\n";
 		/squashfs/ and $ret .= "\tselect USES_SQUASHFS\n";
 		/jffs2/ and $ret .= "\tselect USES_JFFS2\n";
 		/ext4/ and $ret .= "\tselect USES_EXT4\n";

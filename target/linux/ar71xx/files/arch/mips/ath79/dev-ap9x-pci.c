@@ -13,7 +13,6 @@
 #include <linux/delay.h>
 
 #include <asm/mach-ath79/ath79.h>
-#include <asm/mach-ath79/pci.h>
 
 #include "dev-ap9x-pci.h"
 #include "pci-ath9k-fixup.h"
@@ -38,6 +37,19 @@ __init void ap9x_pci_setup_wmac_led_pin(unsigned wmac, int pin)
 		ap9x_wmac1_data.led_pin = pin;
 		break;
 	}
+}
+
+__init struct ath9k_platform_data *ap9x_pci_get_wmac_data(unsigned wmac)
+{
+	switch (wmac) {
+	case 0:
+		return &ap9x_wmac0_data;
+
+	case 1:
+		return &ap9x_wmac1_data;
+	}
+
+	return NULL;
 }
 
 __init void ap9x_pci_setup_wmac_gpio(unsigned wmac, u32 mask, u32 val)

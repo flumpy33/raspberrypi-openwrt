@@ -122,6 +122,7 @@ define KernelPackage/ipt-ipopt/description
  - statistic
  - tcpmss
  - time
+ - ttl/TTL
  - unclean
 endef
 
@@ -219,6 +220,7 @@ define KernelPackage/ipt-nathelper-extra/description
  - proto_gre
  - sip
  - snmp_basic
+ - broadcast
 endef
 
 $(eval $(call KernelPackage,ipt-nathelper-extra))

@@ -43,11 +43,22 @@
 #define RB750_LED_PORT3		BIT(RB750_GPIO_LED_PORT3)
 #define RB750_LED_PORT4		BIT(RB750_GPIO_LED_PORT4)
 #define RB750_LED_PORT5		BIT(RB750_GPIO_LED_PORT5)
+#define RB750_NAND_NCE		BIT(RB750_GPIO_NAND_NCE)
 
 #define RB750_LVC573_LE		BIT(RB750_GPIO_LVC573_LE)
 
 #define RB750_LED_BITS	(RB750_LED_PORT1 | RB750_LED_PORT2 | RB750_LED_PORT3 | \
 			 RB750_LED_PORT4 | RB750_LED_PORT5 | RB750_LED_ACT)
+
+#define RB7XX_GPIO_NAND_NCE	0
+#define RB7XX_GPIO_MON		9
+#define RB7XX_GPIO_LED_ACT	11
+#define RB7XX_GPIO_USB_POWERON	13
+
+#define RB7XX_NAND_NCE		BIT(RB7XX_GPIO_NAND_NCE)
+#define RB7XX_LED_ACT		BIT(RB7XX_GPIO_LED_ACT)
+#define RB7XX_MONITOR		BIT(RB7XX_GPIO_MON)
+#define RB7XX_USB_POWERON	BIT(RB7XX_GPIO_USB_POWERON)
 
 struct rb750_led_data {
 	char	*name;
@@ -59,10 +70,15 @@ struct rb750_led_data {
 struct rb750_led_platform_data {
 	int			num_leds;
 	struct rb750_led_data	*leds;
+	void			(*latch_change)(u32 clear, u32 set);
 };
 
-int rb750_latch_change(u32 mask_clr, u32 mask_set);
-void rb750_nand_pins_enable(void);
-void rb750_nand_pins_disable(void);
+struct rb7xx_nand_platform_data {
+	u32 nce_line;
+
+	void (*enable_pins)(void);
+	void (*disable_pins)(void);
+	void (*latch_change)(u32, u32);
+};
 
 #endif /* _MACH_RB750_H */

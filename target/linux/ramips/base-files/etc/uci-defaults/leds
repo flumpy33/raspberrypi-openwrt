@@ -1,43 +1,34 @@
 #!/bin/sh
 
+. /lib/functions/uci-defaults.sh
 . /lib/ramips.sh
 
 set_usb_led() {
-	local sysfs="$1"
-
-	uci batch <<EOF
-set system.usb_led=led
-set system.usb_led.name='usb'
-set system.usb_led.sysfs='$sysfs'
-set system.usb_led.trigger='usbdev'
-set system.usb_led.dev='1-1'
-set system.usb_led.interval='50'
-commit system
-EOF
+	ucidef_set_led_usbdev "usb" "USB" "$1" "1-1"
 }
 
 set_wifi_led() {
-	local sysfs="$1"
-
-	uci batch <<EOF
-set system.wifi_led=led
-set system.wifi_led.name='wifi'
-set system.wifi_led.sysfs='$sysfs'
-set system.wifi_led.trigger='netdev'
-set system.wifi_led.dev='wlan0'
-set system.wifi_led.mode='link rx tx'
-commit system
-EOF
+	ucidef_set_led_netdev "wifi_led" "wifi" "$1" "wlan0"
 }
 
 board=$(ramips_board_name)
 
 case $board in
+	3g-6200n)
+		set_wifi_led "edimax:amber:wlan"
+		set_usb_led "edimax:blue:3g"
+		;;
 	all0256n)
 		set_wifi_led "rt2800pci-phy0::radio"
 		;;
 	bc2)
 		set_usb_led "bc2:blue:usb"
+		;;
+	dir-300-b1|\
+	dir-600-b1|\
+	dir-600-b2)
+		# ANDed with vlan switch port 4 led state
+		ucidef_set_led_default "wan" "WAN LED (amber)" "d-link:amber:wan" "1"
 		;;
 	esr-9753)
 		set_wifi_led "rt2800pci-phy0::radio"
@@ -49,7 +40,8 @@ case $board in
 		set_usb_led "f5d8235v2:blue:storage"
 		;;
 	fonera20n)
-		set_usb_led "fonera20n:amber:usb"
+		set_usb_led "fonera20n:orange:usb"
+		set_wifi_led "fonera20n:orange:wifi"
 		;;
 	hw550-3g)
 		set_usb_led "hw550-3g:green:usb"
@@ -60,6 +52,15 @@ case $board in
 	nw718)
 		set_usb_led "nw718:amber:usb"
 		;;
+	sl-r7205)
+		set_wifi_led "rt2800pci-phy0::radio"
+		;;
+	v11st-fe)
+		set_wifi_led "rt2800pci-phy0::radio"
+		;;
+	w306r-v20)
+		set_wifi_led "rt2800pci-phy0::radio"
+		;;
 	w502u)
 		set_usb_led "alfa:blue:usb"
 		set_wifi_led "rt2800pci-phy0::radio"
@@ -68,3 +69,7 @@ case $board in
 		set_usb_led "wcr150gn:amber:user"
 		;;
 esac
+
+ucidef_commit_leds
+
+exit 0

@@ -35,12 +35,14 @@ install_bin() { # <file> [ <symlink> ... ]
 
 pivot() { # <new_root> <old_root>
 	mount | grep "on $1 type" 2>&- 1>&- || mount -o bind $1 $1
-	mkdir -p $1$2 $1/proc $1/dev $1/tmp $1/overlay && \
+	mkdir -p $1$2 $1/proc $1/sys $1/dev $1/tmp $1/overlay && \
 	mount -o move /proc $1/proc && \
 	pivot_root $1 $1$2 || {
         umount $1 $1
 		return 1
 	}
+
+	mount -o move $2/sys /sys
 	mount -o move $2/dev /dev
 	mount -o move $2/tmp /tmp
 	mount -o move $2/overlay /overlay 2>&-
@@ -58,7 +60,7 @@ run_ramfs() { # <command> [...]
 	for file in $RAMFS_COPY_BIN; do
 		install_bin $file
 	done
-	install_file /etc/resolv.conf /etc/functions.sh /lib/upgrade/*.sh $RAMFS_COPY_DATA
+	install_file /etc/resolv.conf /lib/functions.sh /lib/functions.sh /lib/upgrade/*.sh $RAMFS_COPY_DATA
 
 	pivot $RAM_ROOT /mnt || {
 		echo "Failed to switch over to ramfs. Please reboot."
@@ -83,6 +85,8 @@ kill_remaining() { # [ <signal> ]
 
 	local stat
 	for stat in /proc/[0-9]*/stat; do
+		[ -f "$stat" ] || continue
+
 		local pid name state ppid rest
 		read pid name state ppid rest < $stat
 		name="${name#(}"; name="${name%)}"
@@ -95,7 +99,7 @@ kill_remaining() { # [ <signal> ]
 
 		case "$name" in
 			# Skip essential services
-			*ash*|*init*|*watchdog*|*ssh*|*dropbear*|*telnet*|*login*|*ubusd*|*netifd*|*hostapd*|*wpa_supplicant*|*udhcpc*) : ;;
+			*ash*|*init*|*watchdog*|*ssh*|*dropbear*|*telnet*|*login*|*hostapd*|*wpa_supplicant*) : ;;
 
 			# Killable process
 			*)

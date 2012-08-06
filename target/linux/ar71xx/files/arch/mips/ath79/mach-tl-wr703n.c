@@ -53,7 +53,7 @@ static struct gpio_keys_button tl_wr703n_gpio_keys[] __initdata = {
 		.code		= KEY_RESTART,
 		.debounce_interval = TL_WR703N_KEYS_DEBOUNCE_INTERVAL,
 		.gpio		= TL_WR703N_GPIO_BTN_RESET,
-		.active_low	= 1,
+		.active_low	= 0,
 	}
 };
 
@@ -69,8 +69,8 @@ static void __init tl_wr703n_setup(void)
 					ARRAY_SIZE(tl_wr703n_gpio_keys),
 					tl_wr703n_gpio_keys);
 
-	gpio_request(TL_WR703N_GPIO_USB_POWER, "USB power");
-	gpio_direction_output(TL_WR703N_GPIO_USB_POWER, 1);
+	ath79_set_usb_power_gpio(TL_WR703N_GPIO_USB_POWER, GPIOF_OUT_INIT_HIGH,
+				"USB power");
 	ath79_register_usb();
 
 	ath79_init_mac(ath79_eth0_data.mac_addr, mac, 0);

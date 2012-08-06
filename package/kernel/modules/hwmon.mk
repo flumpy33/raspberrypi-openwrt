@@ -30,6 +30,36 @@ define AddDepends/hwmon
   DEPENDS:=kmod-hwmon-core $(1)
 endef
 
+define KernelPackage/hwmon-vid
+  TITLE:=VID/VRM/VRD voltage conversion module.
+  KCONFIG:=CONFIG_HWMON_VID
+  FILES:=$(LINUX_DIR)/drivers/hwmon/hwmon-vid.ko
+  AUTOLOAD:=$(call AutoLoad,41,hwmon-vid)
+  $(call AddDepends/hwmon,)
+endef
+
+define KernelPackage/hwmon-vid/description
+  VID/VRM/VRD voltage conversion module for hardware monitoring.
+endef
+
+$(eval $(call KernelPackage,hwmon-vid))
+
+
+define KernelPackage/hwmon-adt7475
+  TITLE:=ADT7473/7475/7476/7490 monitoring support
+  KCONFIG:=CONFIG_SENSORS_ADT7475
+  FILES:=$(LINUX_DIR)/drivers/hwmon/adt7475.ko
+  AUTOLOAD:=$(call AutoLoad,60,adt7475)
+  $(call AddDepends/hwmon,+kmod-i2c-core +kmod-hwmon-vid)
+endef
+
+define KernelPackage/hwmon-adt7475/description
+  Kernel module for ADT7473/7475/7476/7490 thermal monitor chip.
+endef
+
+$(eval $(call KernelPackage,hwmon-adt7475))
+
+
 define KernelPackage/hwmon-lm63
   TITLE:=LM63/64 monitoring support
   KCONFIG:=CONFIG_SENSORS_LM63
@@ -75,6 +105,21 @@ endef
 $(eval $(call KernelPackage,hwmon-lm77))
 
 
+define KernelPackage/hwmon-lm85
+  TITLE:=LM85 monitoring support
+  KCONFIG:=CONFIG_SENSORS_LM85
+  FILES:=$(LINUX_DIR)/drivers/hwmon/lm85.ko
+  AUTOLOAD:=$(call AutoLoad,60,lm85)
+  $(call AddDepends/hwmon,+kmod-i2c-core +kmod-hwmon-vid)
+endef
+
+define KernelPackage/hwmon-lm85/description
+ Kernel module for LM85 thermal monitor chip
+endef
+
+$(eval $(call KernelPackage,hwmon-lm85))
+
+
 define KernelPackage/hwmon-lm90
   TITLE:=LM90 monitoring support
   KCONFIG:=CONFIG_SENSORS_LM90
@@ -103,17 +148,26 @@ endef
 
 $(eval $(call KernelPackage,hwmon-lm95241))
 
+define KernelPackage/hwmon-sht21
+  TITLE:=Sensiron SHT21 and compat. monitoring support
+  KCONFIG:=CONFIG_SENSORS_SHT21
+  FILES:=$(LINUX_DIR)/drivers/hwmon/sht21.ko
+  AUTOLOAD:=$(call AutoLoad,60,sht21)
+  $(call AddDepends/hwmon,+kmod-i2c-core)
+endef
+
+define KernelPackage/hwmon-sht21/description
+ Kernel module for Sensirion SHT21 and SHT25 temperature and humidity sensors chip
+endef
+
+$(eval $(call KernelPackage,hwmon-sht21))
 
 define KernelPackage/hwmon-pc87360
   TITLE:=PC87360 monitoring support
-  KCONFIG:= \
-	CONFIG_SENSORS_PC87360 \
-	CONFIG_HWMON_VID
-  FILES:= \
-	$(LINUX_DIR)/drivers/hwmon/hwmon-vid.ko \
-	$(LINUX_DIR)/drivers/hwmon/pc87360.ko
-  AUTOLOAD:=$(call AutoLoad,50,hwmon-vid pc87360)
-  $(call AddDepends/hwmon,@TARGET_x86)
+  KCONFIG:=CONFIG_SENSORS_PC87360
+  FILES:=$(LINUX_DIR)/drivers/hwmon/pc87360.ko
+  AUTOLOAD:=$(call AutoLoad,50,pc87360)
+  $(call AddDepends/hwmon,@TARGET_x86 +kmod-hwmon-vid)
 endef
 
 define KernelPackage/hwmon-pc87360/description
@@ -125,14 +179,10 @@ $(eval $(call KernelPackage,hwmon-pc87360))
 
 define KernelPackage/hwmon-w83627hf
   TITLE:=Winbond W83627HF monitoring support
-  KCONFIG:= \
-	CONFIG_SENSORS_W83627HF \
-	CONFIG_HWMON_VID
-  FILES:= \
-	$(LINUX_DIR)/drivers/hwmon/hwmon-vid.ko \
-	$(LINUX_DIR)/drivers/hwmon/w83627hf.ko
-  AUTOLOAD:=$(call AutoLoad,50,hwmon-vid w83627hf)
-$(call AddDepends/hwmon,@TARGET_rdc||TARGET_x86)
+  KCONFIG:=CONFIG_SENSORS_W83627HF
+  FILES:=$(LINUX_DIR)/drivers/hwmon/w83627hf.ko
+  AUTOLOAD:=$(call AutoLoad,50,w83627hf)
+$(call AddDepends/hwmon,@TARGET_rdc||TARGET_x86 +kmod-hwmon-vid)
 endef
 
 define KernelPacakge/hwmon-w83627hf/description

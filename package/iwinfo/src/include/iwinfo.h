@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <net/if.h>
 #include <errno.h>
 
@@ -48,10 +49,33 @@ extern const char *IWINFO_KMGMT_NAMES[];
 extern const char *IWINFO_AUTH_NAMES[];
 
 
+enum iwinfo_opmode {
+	IWINFO_OPMODE_UNKNOWN = 0,
+	IWINFO_OPMODE_MASTER  = 1,
+	IWINFO_OPMODE_ADHOC   = 2,
+	IWINFO_OPMODE_CLIENT  = 3,
+	IWINFO_OPMODE_MONITOR = 4,
+};
+
+extern const char *IWINFO_OPMODE_NAMES[];
+
+
+struct iwinfo_rate_entry {
+	uint32_t rate;
+	int8_t mcs;
+	uint8_t is_40mhz:1;
+	uint8_t is_short_gi:1;
+};
+
 struct iwinfo_assoclist_entry {
 	uint8_t	mac[6];
 	int8_t signal;
 	int8_t noise;
+	uint32_t inactive;
+	uint32_t rx_packets;
+	uint32_t tx_packets;
+	struct iwinfo_rate_entry rx_rate;
+	struct iwinfo_rate_entry tx_rate;
 };
 
 struct iwinfo_txpwrlist_entry {
@@ -77,7 +101,7 @@ struct iwinfo_crypto_entry {
 struct iwinfo_scanlist_entry {
 	uint8_t mac[6];
 	uint8_t ssid[IWINFO_ESSID_MAX_SIZE+1];
-	uint8_t mode[8];
+	enum iwinfo_opmode mode;
 	uint8_t channel;
 	uint8_t signal;
 	uint8_t quality;
@@ -118,6 +142,7 @@ extern const struct iwinfo_hardware_entry IWINFO_HARDWARE_ENTRIES[];
 
 
 struct iwinfo_ops {
+	int (*mode)(const char *, int *);
 	int (*channel)(const char *, int *);
 	int (*frequency)(const char *, int *);
 	int (*frequency_offset)(const char *, int *);
@@ -130,7 +155,6 @@ struct iwinfo_ops {
 	int (*quality_max)(const char *, int *);
 	int (*mbssid_support)(const char *, int *);
 	int (*hwmodelist)(const char *, int *);
-	int (*mode)(const char *, char *);
 	int (*ssid)(const char *, char *);
 	int (*bssid)(const char *, char *);
 	int (*country)(const char *, char *);

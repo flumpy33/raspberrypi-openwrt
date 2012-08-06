@@ -12,7 +12,7 @@ __target_inc=1
 DEVICE_TYPE?=router
 
 # Default packages - the really basic set
-DEFAULT_PACKAGES:=base-files libc libgcc busybox dropbear mtd uci opkg hotplug2
+DEFAULT_PACKAGES:=base-files libc libgcc busybox dropbear mtd uci opkg hotplug2 netifd
 # For router targets
 DEFAULT_PACKAGES.router:=dnsmasq iptables ppp ppp-mod-pppoe kmod-ipt-nathelper firewall
 DEFAULT_PACKAGES.bootloader:=
@@ -84,12 +84,12 @@ endif
 
 ifneq ($(PLATFORM_DIR),$(PLATFORM_SUBDIR))
   define IncludeProfiles
-    -include $(PLATFORM_DIR)/profiles/*.mk
-    -include $(PLATFORM_SUBDIR)/profiles/*.mk
+    -include $(sort $(wildcard $(PLATFORM_DIR)/profiles/*.mk))
+    -include $(sort $(wildcard $(PLATFORM_SUBDIR)/profiles/*.mk))
   endef
 else
   define IncludeProfiles
-    -include $(PLATFORM_DIR)/profiles/*.mk
+    -include $(sort $(wildcard $(PLATFORM_DIR)/profiles/*.mk))
   endef
 endif
 
@@ -182,6 +182,9 @@ ifeq ($(DUMP),1)
     endif
     ifneq ($(CONFIG_VGA_CONSOLE)$(CONFIG_FB),)
       FEATURES += display
+    endif
+    ifneq ($(CONFIG_RTC_CLASS),)
+      FEATURES += rtc
     endif
 
     # remove duplicates

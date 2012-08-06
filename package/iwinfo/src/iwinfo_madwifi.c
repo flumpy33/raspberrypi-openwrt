@@ -333,7 +333,7 @@ void madwifi_close(void)
 	/* Nop */
 }
 
-int madwifi_get_mode(const char *ifname, char *buf)
+int madwifi_get_mode(const char *ifname, int *buf)
 {
 	return wext_get_mode(ifname, buf);
 }
@@ -726,9 +726,29 @@ int madwifi_get_assoclist(const char *ifname, char *buf, int *len)
 		do {
 			si = (struct ieee80211req_sta_info *) cp;
 
+			memset(&entry, 0, sizeof(entry));
+
 			entry.signal = (si->isi_rssi - 95);
 			entry.noise  = noise;
 			memcpy(entry.mac, &si->isi_macaddr, 6);
+
+			entry.inactive = si->isi_inact * 1000;
+
+			entry.tx_packets = (si->isi_txseqs[0] & IEEE80211_SEQ_SEQ_MASK)
+				>> IEEE80211_SEQ_SEQ_SHIFT;
+
+			entry.rx_packets = (si->isi_rxseqs[0] & IEEE80211_SEQ_SEQ_MASK)
+				>> IEEE80211_SEQ_SEQ_SHIFT;
+
+			entry.tx_rate.rate =
+				(si->isi_rates[si->isi_txrate] & IEEE80211_RATE_VAL) * 500;
+
+			/* XXX: this is just a guess */
+			entry.rx_rate.rate = entry.tx_rate.rate;
+
+			entry.rx_rate.mcs = -1;
+			entry.tx_rate.mcs = -1;
+
 			memcpy(&buf[bl], &entry, sizeof(struct iwinfo_assoclist_entry));
 
 			bl += sizeof(struct iwinfo_assoclist_entry);
@@ -988,40 +1008,6 @@ int madwifi_get_mbssid_support(const char *ifname, int *buf)
 	return -1;
 }
 
-static void madwifi_proc_file(const char *ifname, const char *file,
-							  char *buf, int blen)
-{
-	int fd;
-	const char *wifi = madwifi_isvap(ifname, NULL);
-
-	if (!wifi && madwifi_iswifi(ifname))
-		wifi = ifname;
-
-	snprintf(buf, blen, "/proc/sys/dev/%s/%s", wifi, file);
-
-	if ((fd = open(buf, O_RDONLY)) > 0)
-	{
-		if (read(fd, buf, blen) > 1)
-			buf[strlen(buf)-1] = 0;
-		else
-			buf[0] = 0;
-
-		close(fd);
-	}
-	else
-	{
-		buf[0] = 0;
-	}
-}
-
-static int madwifi_startswith(const char *a, const char *b)
-{
-	int l1 = strlen(a);
-	int l2 = strlen(b);
-	int ln = (l1 < l2) ? l1 : l2;
-	return !strncmp(a, b, ln);
-}
-
 int madwifi_get_hardware_id(const char *ifname, char *buf)
 {
 	char vendor[64];
@@ -1030,32 +1016,7 @@ int madwifi_get_hardware_id(const char *ifname, char *buf)
 	struct iwinfo_hardware_entry *e;
 
 	if (wext_get_hardware_id(ifname, buf))
-	{
-		ids = (struct iwinfo_hardware_id *)buf;
-		madwifi_proc_file(ifname, "dev_vendor", vendor, sizeof(vendor));
-		madwifi_proc_file(ifname, "dev_name",   device, sizeof(device));
-
-		if (vendor[0] && device[0])
-		{
-			for (e = IWINFO_HARDWARE_ENTRIES; e->vendor_name; e++)
-			{
-				if (!madwifi_startswith(vendor, e->vendor_name))
-					continue;
-
-				if (!madwifi_startswith(device, e->device_name))
-					continue;
-
-				ids->vendor_id = e->vendor_id;
-				ids->device_id = e->device_id;
-				ids->subsystem_vendor_id = e->subsystem_vendor_id;
-				ids->subsystem_device_id = e->subsystem_device_id;
-
-				return 0;
-			}
-		}
-
-		return -1;
-	}
+		return iwinfo_hardware_id_from_mtd((struct iwinfo_hardware_id *)buf);
 
 	return 0;
 }
@@ -1073,24 +1034,12 @@ madwifi_get_hardware_entry(const char *ifname)
 
 int madwifi_get_hardware_name(const char *ifname, char *buf)
 {
-	char vendor[64];
-	char device[64];
 	const struct iwinfo_hardware_entry *hw;
 
 	if (!(hw = madwifi_get_hardware_entry(ifname)))
-	{
-		madwifi_proc_file(ifname, "dev_vendor", vendor, sizeof(vendor));
-		madwifi_proc_file(ifname, "dev_name",   device, sizeof(device));
-
-		if (vendor[0] && device[0])
-			sprintf(buf, "%s %s", vendor, device);
-		else
-			sprintf(buf, "Generic Atheros");
-	}
+		sprintf(buf, "Generic Atheros");
 	else
-	{
 		sprintf(buf, "%s %s", hw->vendor_name, hw->device_name);
-	}
 
 	return 0;
 }

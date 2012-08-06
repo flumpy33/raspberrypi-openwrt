@@ -64,7 +64,7 @@ $(eval $(call KernelPackage,crypto-manager))
 
 define KernelPackage/crypto-user
   TITLE:=CryptoAPI userspace interface
-  DEPENDS:=+kmod-crypto-hash +kmod-crypto-manager @!LINUX_2_6_30&&!LINUX_2_6_31&&!LINUX_2_6_32&&!LINUX_2_6_36&&!LINUX_2_6_37
+  DEPENDS:=+kmod-crypto-hash +kmod-crypto-manager
   KCONFIG:= \
 	CONFIG_CRYPTO_USER_API \
 	CONFIG_CRYPTO_USER_API_HASH \
@@ -152,23 +152,6 @@ define KernelPackage/crypto-hw-hifn-795x
 endef
 
 $(eval $(call KernelPackage,crypto-hw-hifn-795x))
-
-
-define KernelPackage/crypto-hw-ixp4xx
-  TITLE:=Intel IXP4xx hardware crypto module
-  DEPENDS:=@TARGET_ixp4xx
-  KCONFIG:= \
-	CONFIG_CRYPTO_DEV_IXP4XX
-  FILES:=$(LINUX_DIR)/drivers/crypto/ixp4xx_crypto.ko
-  AUTOLOAD:=$(call AutoLoad,90,ixp4xx_crypto)
-  $(call AddDepends/crypto,+kmod-crypto-authenc +kmod-crypto-des)
-endef
-
-define KernelPackage/crypto-hw-ixp4xx/description
-  Kernel support for the Intel IXP4xx HW crypto engine.
-endef
-
-$(eval $(call KernelPackage,crypto-hw-ixp4xx))
 
 
 define KernelPackage/crypto-hw-ppc4xx
@@ -374,24 +357,12 @@ define KernelPackage/crypto-misc
 	$(LINUX_DIR)/crypto/tea.ko \
 	$(LINUX_DIR)/crypto/tgr192.ko \
 	$(LINUX_DIR)/crypto/twofish_common.ko \
-	$(LINUX_DIR)/crypto/wp512.ko
-  ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),le,2.6.35)),1)
-    FILES += $(LINUX_DIR)/crypto/twofish.ko
-  else
-    FILES += $(LINUX_DIR)/crypto/twofish_generic.ko
-  endif
-  ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),le,3.1)),1)
-    FILES += $(LINUX_DIR)/crypto/blowfish.ko
-  else
-    FILES += \
+	$(LINUX_DIR)/crypto/wp512.ko \
+    $(LINUX_DIR)/crypto/twofish_generic.ko
+  FILES += \
 	$(LINUX_DIR)/crypto/blowfish_common.ko \
-	$(LINUX_DIR)/crypto/blowfish_generic.ko
-  endif
-  ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),le,3.2)),1)
-    FILES += $(LINUX_DIR)/crypto/serpent.ko
-  else
-    FILES += $(LINUX_DIR)/crypto/serpent_generic.ko
-  endif
+	$(LINUX_DIR)/crypto/blowfish_generic.ko \
+    $(LINUX_DIR)/crypto/serpent_generic.ko
   $(call AddDepends/crypto)
 endef
 
@@ -405,7 +376,7 @@ $(eval $(call KernelPackage,crypto-misc))
 
 define KernelPackage/crypto-ocf
   TITLE:=OCF modules
-  DEPENDS:=+@OPENSSL_ENGINE @!TARGET_uml +kmod-crypto-manager
+  DEPENDS:=+@OPENSSL_ENGINE_CRYPTO @!TARGET_uml +kmod-crypto-manager
   KCONFIG:= \
 	CONFIG_OCF_OCF \
 	CONFIG_OCF_CRYPTODEV \
@@ -429,7 +400,7 @@ $(eval $(call KernelPackage,crypto-ocf))
 
 define KernelPackage/crypto-ocf-hifn7751
   TITLE:=OCF support for Hifn 6500/7751/7811/795x, Invertex AEON and NetSec 7751 devices
-  DEPENDS:=+@OPENSSL_ENGINE @PCI_SUPPORT @!TARGET_uml kmod-crypto-ocf
+  DEPENDS:=+@OPENSSL_ENGINE_CRYPTO @PCI_SUPPORT @!TARGET_uml kmod-crypto-ocf
   KCONFIG:=CONFIG_OCF_HIFN
   FILES:=$(LINUX_DIR)/crypto/ocf/hifn/hifn7751.ko
   AUTOLOAD:=$(call AutoLoad,10,hifn7751)
@@ -441,7 +412,7 @@ $(eval $(call KernelPackage,crypto-ocf-hifn7751))
 
 define KernelPackage/crypto-ocf-hifnhipp
   TITLE:=OCF support for Hifn 7855/8155 devices
-  DEPENDS:=+@OPENSSL_ENGINE @PCI_SUPPORT @!TARGET_uml kmod-crypto-ocf
+  DEPENDS:=+@OPENSSL_ENGINE_CRYPTO @PCI_SUPPORT @!TARGET_uml kmod-crypto-ocf
   KCONFIG:=CONFIG_OCF_HIFNHIPP
   FILES:=$(LINUX_DIR)/crypto/ocf/hifn/hifnHIPP.ko
   AUTOLOAD:=$(call AutoLoad,10,hifnHIPP)
@@ -500,19 +471,3 @@ define KernelPackage/crypto-mv-cesa
 endef
 
 $(eval $(call KernelPackage,crypto-mv-cesa))
-
-
-define KernelPackage/ocf-ubsec-ssb
-  TITLE:=BCM5365P IPSec Core driver
-  DEPENDS:=@TARGET_brcm47xx +kmod-crypto-ocf
-  KCONFIG:=CONFIG_OCF_UBSEC_SSB
-  FILES:=$(LINUX_DIR)/crypto/ocf/ubsec_ssb/ubsec_ssb.ko
-  AUTOLOAD:=$(call AutoLoad,10,ubsec_ssb)
-  $(call AddDepends/crypto)
-endef
-
-define KernelPackage/ocf-ubsec-ssb/description
-  This package contains the OCF driver for the BCM5365p IPSec Core
-endef
-
-$(eval $(call KernelPackage,ocf-ubsec-ssb))

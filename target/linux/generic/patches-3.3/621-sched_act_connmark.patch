@@ -46,7 +46,7 @@
 +	.lock	=	&connmark_lock,
 +};
 +
-+static int tcf_connmark(struct sk_buff *skb, struct tc_action *a,
++static int tcf_connmark(struct sk_buff *skb, const struct tc_action *a,
 +		       struct tcf_result *res)
 +{
 +	struct nf_conn *c;
@@ -140,7 +140,7 @@
 +module_exit(connmark_cleanup_module);
 --- a/net/sched/Kconfig
 +++ b/net/sched/Kconfig
-@@ -602,6 +602,19 @@ config NET_ACT_CSUM
+@@ -624,6 +624,19 @@ config NET_ACT_CSUM
  	  To compile this code as a module, choose M here: the
  	  module will be called act_csum.
  

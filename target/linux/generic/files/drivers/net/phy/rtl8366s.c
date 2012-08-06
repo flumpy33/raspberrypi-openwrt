@@ -248,7 +248,7 @@ static int rtl8366s_reset_chip(struct rtl8366_smi *smi)
 	return 0;
 }
 
-static int rtl8366s_hw_init(struct rtl8366_smi *smi)
+static int rtl8366s_setup(struct rtl8366_smi *smi)
 {
 	struct rtl8366_platform_data *pdata;
 	int err;
@@ -732,59 +732,47 @@ static int rtl8366s_sw_set_learning_enable(struct switch_dev *dev,
 	return 0;
 }
 
-
-static const char *rtl8366s_speed_str(unsigned speed)
-{
-	switch (speed) {
-	case 0:
-		return "10baseT";
-	case 1:
-		return "100baseT";
-	case 2:
-		return "1000baseT";
-	}
-
-	return "unknown";
-}
-
 static int rtl8366s_sw_get_port_link(struct switch_dev *dev,
-				     const struct switch_attr *attr,
-				     struct switch_val *val)
+				     int port,
+				     struct switch_port_link *link)
 {
 	struct rtl8366_smi *smi = sw_to_rtl8366_smi(dev);
-	u32 len = 0, data = 0;
+	u32 data = 0;
+	u32 speed;
 
-	if (val->port_vlan >= RTL8366S_NUM_PORTS)
+	if (port >= RTL8366S_NUM_PORTS)
 		return -EINVAL;
 
-	memset(smi->buf, '\0', sizeof(smi->buf));
-	rtl8366_smi_read_reg(smi, RTL8366S_PORT_LINK_STATUS_BASE +
-			     (val->port_vlan / 2), &data);
+	rtl8366_smi_read_reg(smi, RTL8366S_PORT_LINK_STATUS_BASE + (port / 2),
+			     &data);
 
-	if (val->port_vlan % 2)
+	if (port % 2)
 		data = data >> 8;
 
-	if (data & RTL8366S_PORT_STATUS_LINK_MASK) {
-		len = snprintf(smi->buf, sizeof(smi->buf),
-				"port:%d link:up speed:%s %s-duplex %s%s%s",
-				val->port_vlan,
-				rtl8366s_speed_str(data &
-					  RTL8366S_PORT_STATUS_SPEED_MASK),
-				(data & RTL8366S_PORT_STATUS_DUPLEX_MASK) ?
-					"full" : "half",
-				(data & RTL8366S_PORT_STATUS_TXPAUSE_MASK) ?
-					"tx-pause ": "",
-				(data & RTL8366S_PORT_STATUS_RXPAUSE_MASK) ?
-					"rx-pause " : "",
-				(data & RTL8366S_PORT_STATUS_AN_MASK) ?
-					"nway ": "");
-	} else {
-		len = snprintf(smi->buf, sizeof(smi->buf), "port:%d link: down",
-				val->port_vlan);
-	}
+	link->link = !!(data & RTL8366S_PORT_STATUS_LINK_MASK);
+	if (!link->link)
+		return 0;
 
-	val->value.s = smi->buf;
-	val->len = len;
+	link->duplex = !!(data & RTL8366S_PORT_STATUS_DUPLEX_MASK);
+	link->rx_flow = !!(data & RTL8366S_PORT_STATUS_RXPAUSE_MASK);
+	link->tx_flow = !!(data & RTL8366S_PORT_STATUS_TXPAUSE_MASK);
+	link->aneg = !!(data & RTL8366S_PORT_STATUS_AN_MASK);
+
+	speed = (data & RTL8366S_PORT_STATUS_SPEED_MASK);
+	switch (speed) {
+	case 0:
+		link->speed = SWITCH_PORT_SPEED_10;
+		break;
+	case 1:
+		link->speed = SWITCH_PORT_SPEED_100;
+		break;
+	case 2:
+		link->speed = SWITCH_PORT_SPEED_1000;
+		break;
+	default:
+		link->speed = SWITCH_PORT_SPEED_UNKNOWN;
+		break;
+	}
 
 	return 0;
 }
@@ -845,30 +833,6 @@ static int rtl8366s_sw_reset_port_mibs(struct switch_dev *dev,
 				0, (1 << (val->port_vlan + 3)));
 }
 
-static int rtl8366s_sw_reset_switch(struct switch_dev *dev)
-{
-	struct rtl8366_smi *smi = sw_to_rtl8366_smi(dev);
-	int err;
-
-	err = rtl8366s_reset_chip(smi);
-	if (err)
-		return err;
-
-	err = rtl8366s_hw_init(smi);
-	if (err)
-		return err;
-
-	err = rtl8366_reset_vlan(smi);
-	if (err)
-		return err;
-
-	err = rtl8366_enable_vlan(smi, 1);
-	if (err)
-		return err;
-
-	return rtl8366_enable_all_ports(smi, 1);
-}
-
 static struct switch_attr rtl8366s_globals[] = {
 	{
 		.type = SWITCH_TYPE_INT,
@@ -919,13 +883,6 @@ static struct switch_attr rtl8366s_globals[] = {
 
 static struct switch_attr rtl8366s_port[] = {
 	{
-		.type = SWITCH_TYPE_STRING,
-		.name = "link",
-		.description = "Get port link information",
-		.max = 1,
-		.set = NULL,
-		.get = rtl8366s_sw_get_port_link,
-	}, {
 		.type = SWITCH_TYPE_NOVAL,
 		.name = "reset_mib",
 		.description = "Reset single port MIB counters",
@@ -983,7 +940,8 @@ static const struct switch_dev_ops rtl8366_ops = {
 	.set_vlan_ports = rtl8366_sw_set_vlan_ports,
 	.get_port_pvid = rtl8366_sw_get_port_pvid,
 	.set_port_pvid = rtl8366_sw_set_port_pvid,
-	.reset_switch = rtl8366s_sw_reset_switch,
+	.reset_switch = rtl8366_sw_reset_switch,
+	.get_port_link = rtl8366s_sw_get_port_link,
 };
 
 static int rtl8366s_switch_init(struct rtl8366_smi *smi)
@@ -1036,18 +994,6 @@ static int rtl8366s_mii_write(struct mii_bus *bus, int addr, int reg, u16 val)
 	return err;
 }
 
-static int rtl8366s_setup(struct rtl8366_smi *smi)
-{
-	int ret;
-
-	ret = rtl8366s_reset_chip(smi);
-	if (ret)
-		return ret;
-
-	ret = rtl8366s_hw_init(smi);
-	return ret;
-}
-
 static int rtl8366s_detect(struct rtl8366_smi *smi)
 {
 	u32 chip_id = 0;
@@ -1083,6 +1029,7 @@ static int rtl8366s_detect(struct rtl8366_smi *smi)
 
 static struct rtl8366_smi_ops rtl8366s_smi_ops = {
 	.detect		= rtl8366s_detect,
+	.reset_chip	= rtl8366s_reset_chip,
 	.setup		= rtl8366s_setup,
 
 	.mii_read	= rtl8366s_mii_read,
@@ -1127,6 +1074,8 @@ static int __devinit rtl8366s_probe(struct platform_device *pdev)
 
 	smi->gpio_sda = pdata->gpio_sda;
 	smi->gpio_sck = pdata->gpio_sck;
+	smi->hw_reset = pdata->hw_reset;
+
 	smi->clk_delay = 10;
 	smi->cmd_read = 0xa9;
 	smi->cmd_write = 0xa8;

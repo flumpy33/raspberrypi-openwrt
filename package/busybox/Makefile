@@ -1,5 +1,5 @@
 # 
-# Copyright (C) 2006-2011 OpenWrt.org
+# Copyright (C) 2006-2012 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -8,16 +8,16 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=busybox
-PKG_VERSION:=1.19.3
-PKG_RELEASE:=9
+PKG_VERSION:=1.19.4
+PKG_RELEASE:=2
 PKG_FLAGS:=essential
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
 PKG_SOURCE_URL:=http://www.busybox.net/downloads \
 		http://distfiles.gentoo.org/distfiles/
-PKG_MD5SUM:=c3938e1ac59602387009bbf1dd1af7f6
+PKG_MD5SUM:=9c0cae5a0379228e7b55e5b29528df8e
 
-PKG_BUILD_DEPENDS:=BUSYBOX_USE_LIBRPC:librpc
+PKG_BUILD_DEPENDS:=BUSYBOX_CONFIG_FEATURE_HAVE_RPC:librpc
 PKG_BUILD_PARALLEL:=1
 
 include $(INCLUDE_DIR)/package.mk
@@ -37,7 +37,7 @@ define Package/busybox
   MAINTAINER:=Nicolas Thill <nico@openwrt.org>
   TITLE:=Core utilities for embedded Linux
   URL:=http://busybox.net/
-  DEPENDS:=+BUSYBOX_USE_LIBRPC:librpc
+  DEPENDS:=+BUSYBOX_CONFIG_FEATURE_HAVE_RPC:librpc
   MENU:=1
 endef
 
@@ -66,7 +66,7 @@ ifdef CONFIG_GCC_VERSION_LLVM
 endif
 
 LDLIBS:=m crypt
-ifdef CONFIG_BUSYBOX_USE_LIBRPC
+ifdef CONFIG_BUSYBOX_CONFIG_FEATURE_HAVE_RPC
   TARGET_CFLAGS += -I$(STAGING_DIR)/usr/include
   export LDFLAGS=$(TARGET_LDFLAGS)
   LDLIBS += rpc

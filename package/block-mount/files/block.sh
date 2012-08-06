@@ -4,7 +4,7 @@
 # See /LICENSE for more information.
 #
 
-. /etc/functions.sh
+. /lib/functions.sh
 
 reset_block_cb() {
 	mount_cb() { 
@@ -157,7 +157,7 @@ libmount_find_token() {
 	local token="$1"
 	local value="$2"
 	local device
-	device="$(blkid | grep "$token=\"$value\"" | cut -f1 -d:)"
+	device="$(blkid -w /dev/null -c /dev/null | grep "$token=\"$value\"" | cut -f1 -d:)"
 	echo "$device"
 }
 

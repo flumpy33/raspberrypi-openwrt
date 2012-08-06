@@ -83,6 +83,7 @@
 #define AR7240_MIB_AT_HALF_EN		BIT(16)
 #define AR7240_MIB_BUSY			BIT(17)
 #define AR7240_MIB_FUNC_S		24
+#define AR7240_MIB_FUNC_M		BITM(3)
 #define AR7240_MIB_FUNC_NO_OP		0x0
 #define AR7240_MIB_FUNC_FLUSH		0x1
 #define AR7240_MIB_FUNC_CAPTURE		0x3
@@ -206,6 +207,19 @@
 
 #define AR934X_REG_OPER_MODE1		0x08
 #define   AR934X_REG_OPER_MODE1_PHY4_MII_EN	BIT(28)
+
+#define AR934X_REG_FLOOD_MASK		0x2c
+#define   AR934X_FLOOD_MASK_BC_DP(_p)	BIT(25 + (_p))
+
+#define AR934X_REG_QM_CTRL		0x3c
+#define   AR934X_QM_CTRL_ARP_EN		BIT(15)
+
+#define AR934X_REG_AT_CTRL		0x5c
+#define   AR934X_AT_CTRL_AGE_TIME	BITS(0, 15)
+#define   AR934X_AT_CTRL_AGE_EN		BIT(17)
+#define   AR934X_AT_CTRL_LEARN_CHANGE	BIT(18)
+
+#define AR934X_MIB_ENABLE		BIT(30)
 
 #define AR934X_REG_PORT_BASE(_port)	(0x100 + (_port) * 0x100)
 
@@ -506,8 +520,9 @@ static int ar7240sw_capture_stats(struct ar7240sw *as)
 	write_lock(&as->stats_lock);
 
 	/* Capture the hardware statistics for all ports */
-	ar7240sw_reg_write(mii, AR7240_REG_MIB_FUNCTION0,
-			   (AR7240_MIB_FUNC_CAPTURE << AR7240_MIB_FUNC_S));
+	ar7240sw_reg_rmw(mii, AR7240_REG_MIB_FUNCTION0,
+			 (AR7240_MIB_FUNC_M << AR7240_MIB_FUNC_S),
+			 (AR7240_MIB_FUNC_CAPTURE << AR7240_MIB_FUNC_S));
 
 	/* Wait for the capturing to complete. */
 	ret = ar7240sw_reg_wait(mii, AR7240_REG_MIB_FUNCTION0,
@@ -556,17 +571,35 @@ static void ar7240sw_setup(struct ar7240sw *as)
 	/* Setup TAG priority mapping */
 	ar7240sw_reg_write(mii, AR7240_REG_TAG_PRIORITY, 0xfa50);
 
-	/* Enable ARP frame acknowledge, aging, MAC replacing */
-	ar7240sw_reg_write(mii, AR7240_REG_AT_CTRL,
-		AR7240_AT_CTRL_RESERVED |
-		0x2b /* 5 min age time */ |
-		AR7240_AT_CTRL_AGE_EN |
-		AR7240_AT_CTRL_ARP_EN |
-		AR7240_AT_CTRL_LEARN_CHANGE);
+	if (sw_is_ar934x(as)) {
+		/* Enable aging, MAC replacing */
+		ar7240sw_reg_write(mii, AR934X_REG_AT_CTRL,
+			0x2b /* 5 min age time */ |
+			AR934X_AT_CTRL_AGE_EN |
+			AR934X_AT_CTRL_LEARN_CHANGE);
+		/* Enable ARP frame acknowledge */
+		ar7240sw_reg_set(mii, AR934X_REG_QM_CTRL,
+				 AR934X_QM_CTRL_ARP_EN);
+		/* Enable Broadcast frames transmitted to the CPU */
+		ar7240sw_reg_set(mii, AR934X_REG_FLOOD_MASK,
+				 AR934X_FLOOD_MASK_BC_DP(0));
 
-	/* Enable Broadcast frames transmitted to the CPU */
-	ar7240sw_reg_set(mii, AR7240_REG_FLOOD_MASK,
-			 AR7240_FLOOD_MASK_BROAD_TO_CPU);
+		/* Enable MIB counters */
+		ar7240sw_reg_set(mii, AR7240_REG_MIB_FUNCTION0,
+				 AR934X_MIB_ENABLE);
+
+	} else {
+		/* Enable ARP frame acknowledge, aging, MAC replacing */
+		ar7240sw_reg_write(mii, AR7240_REG_AT_CTRL,
+			AR7240_AT_CTRL_RESERVED |
+			0x2b /* 5 min age time */ |
+			AR7240_AT_CTRL_AGE_EN |
+			AR7240_AT_CTRL_ARP_EN |
+			AR7240_AT_CTRL_LEARN_CHANGE);
+		/* Enable Broadcast frames transmitted to the CPU */
+		ar7240sw_reg_set(mii, AR7240_REG_FLOOD_MASK,
+				 AR7240_FLOOD_MASK_BROAD_TO_CPU);
+	}
 
 	/* setup MTU */
 	ar7240sw_reg_rmw(mii, AR7240_REG_GLOBAL_CTRL, AR7240_GLOBAL_CTRL_MTU_M,
@@ -595,6 +628,16 @@ static int ar7240sw_reset(struct ar7240sw *as)
 
 	ret = ar7240sw_reg_wait(mii, AR7240_REG_MASK_CTRL,
 				AR7240_MASK_CTRL_SOFT_RESET, 0, 1000);
+
+	/* setup PHYs */
+	for (i = 0; i < AR7240_NUM_PHYS; i++) {
+		ar7240sw_phy_write(mii, i, MII_ADVERTISE,
+				   ADVERTISE_ALL | ADVERTISE_PAUSE_CAP |
+				   ADVERTISE_PAUSE_ASYM);
+		ar7240sw_phy_write(mii, i, MII_BMCR,
+				   BMCR_RESET | BMCR_ANENABLE);
+	}
+	msleep(1000);
 
 	ar7240sw_setup(as);
 	return ret;
@@ -631,11 +674,15 @@ static void ar7240sw_setup_port(struct ar7240sw *as, unsigned port, u8 portmask)
 		mode = AR7240_PORT_VLAN_MODE_PORT_ONLY;
 	}
 
-	if (as->vlan && (as->vlan_tagged & BIT(port))) {
-		ctrl |= AR7240_PORT_CTRL_VLAN_MODE_ADD <<
-			AR7240_PORT_CTRL_VLAN_MODE_S;
+	if (as->vlan) {
+		if (as->vlan_tagged & BIT(port))
+			ctrl |= AR7240_PORT_CTRL_VLAN_MODE_ADD <<
+				AR7240_PORT_CTRL_VLAN_MODE_S;
+		else
+			ctrl |= AR7240_PORT_CTRL_VLAN_MODE_STRIP <<
+				AR7240_PORT_CTRL_VLAN_MODE_S;
 	} else {
-		ctrl |= AR7240_PORT_CTRL_VLAN_MODE_STRIP <<
+		ctrl |= AR7240_PORT_CTRL_VLAN_MODE_KEEP <<
 			AR7240_PORT_CTRL_VLAN_MODE_S;
 	}
 
@@ -797,64 +844,6 @@ ar7240_get_vlan(struct switch_dev *dev, const struct switch_attr *attr,
 	return 0;
 }
 
-static const char *
-ar7240_speed_str(u32 status)
-{
-	u32 speed;
-
-	speed = (status >> AR7240_PORT_STATUS_SPEED_S) &
-					AR7240_PORT_STATUS_SPEED_M;
-	switch (speed) {
-	case AR7240_PORT_STATUS_SPEED_10:
-		return "10baseT";
-	case AR7240_PORT_STATUS_SPEED_100:
-		return "100baseT";
-	case AR7240_PORT_STATUS_SPEED_1000:
-		return "1000baseT";
-	}
-
-	return "unknown";
-}
-
-static int
-ar7240_port_get_link(struct switch_dev *dev, const struct switch_attr *attr,
-		     struct switch_val *val)
-{
-	struct ar7240sw *as = sw_to_ar7240(dev);
-	struct mii_bus *mii = as->mii_bus;
-	u32 len;
-	u32 status;
-	int port;
-
-	port = val->port_vlan;
-
-	memset(as->buf, '\0', sizeof(as->buf));
-	status = ar7240sw_reg_read(mii, AR7240_REG_PORT_STATUS(port));
-
-	if (status & AR7240_PORT_STATUS_LINK_UP) {
-		len = snprintf(as->buf, sizeof(as->buf),
-				"port:%d link:up speed:%s %s-duplex %s%s%s",
-				port,
-				ar7240_speed_str(status),
-				(status & AR7240_PORT_STATUS_DUPLEX) ?
-					"full" : "half",
-				(status & AR7240_PORT_STATUS_TXFLOW) ?
-					"txflow ": "",
-				(status & AR7240_PORT_STATUS_RXFLOW) ?
-					"rxflow " : "",
-				(status & AR7240_PORT_STATUS_LINK_AUTO) ?
-					"auto ": "");
-	} else {
-		len = snprintf(as->buf, sizeof(as->buf),
-			       "port:%d link:down", port);
-	}
-
-	val->value.s = as->buf;
-	val->len = len;
-
-	return 0;
-}
-
 static void
 ar7240_vtu_op(struct ar7240sw *as, u32 op, u32 val)
 {
@@ -942,9 +931,15 @@ ar7240_get_port_link(struct switch_dev *dev, int port,
 		return -EINVAL;
 
 	status = ar7240sw_reg_read(mii, AR7240_REG_PORT_STATUS(port));
-
-	link->link = !!(status & AR7240_PORT_STATUS_LINK_UP);
 	link->aneg = !!(status & AR7240_PORT_STATUS_LINK_AUTO);
+	if (link->aneg) {
+		link->link = !!(status & AR7240_PORT_STATUS_LINK_UP);
+		if (!link->link)
+			return 0;
+	} else {
+		link->link = true;
+	}
+
 	link->duplex = !!(status & AR7240_PORT_STATUS_DUPLEX);
 	link->tx_flow = !!(status & AR7240_PORT_STATUS_TXFLOW);
 	link->rx_flow = !!(status & AR7240_PORT_STATUS_RXFLOW);
@@ -994,14 +989,6 @@ static struct switch_attr ar7240_globals[] = {
 };
 
 static struct switch_attr ar7240_port[] = {
-	{
-		.type = SWITCH_TYPE_STRING,
-		.name = "link",
-		.description = "Get port link information",
-		.max = 1,
-		.set = NULL,
-		.get = ar7240_port_get_link,
-	},
 };
 
 static struct switch_attr ar7240_vlan[] = {
@@ -1073,6 +1060,7 @@ static struct ar7240sw *ar7240_probe(struct ag71xx *ag)
 
 	if (sw_is_ar7240(as)) {
 		swdev->name = "AR7240/AR9330 built-in switch";
+		swdev->ports = AR7240_NUM_PORTS - 1;
 	} else if (sw_is_ar934x(as)) {
 		swdev->name = "AR934X built-in switch";
 
@@ -1088,16 +1076,19 @@ static struct ar7240sw *ar7240_probe(struct ag71xx *ag)
 			goto err_free;
 		}
 
-		if (as->swdata->phy4_mii_en)
+		if (as->swdata->phy4_mii_en) {
 			ar7240sw_reg_set(mii, AR934X_REG_OPER_MODE1,
 					 AR934X_REG_OPER_MODE1_PHY4_MII_EN);
+			swdev->ports = AR7240_NUM_PORTS - 1;
+		} else {
+			swdev->ports = AR7240_NUM_PORTS;
+		}
 	} else {
 		pr_err("%s: unsupported chip, ctrl=%08x\n",
 			ag->dev->name, ctrl);
 		goto err_free;
 	}
 
-	swdev->ports = AR7240_NUM_PORTS - 1;
 	swdev->cpu_port = AR7240_PORT_CPU;
 	swdev->vlans = AR7240_MAX_VLANS;
 	swdev->ops = &ar7240_ops;
@@ -1122,20 +1113,28 @@ err_free:
 
 static void link_function(struct work_struct *work) {
 	struct ag71xx *ag = container_of(work, struct ag71xx, link_work.work);
+	struct ar7240sw *as = ag->phy_priv;
 	unsigned long flags;
+	u8 mask;
 	int i;
 	int status = 0;
 
-	for (i = 0; i < 4; i++) {
-		int link = ar7240sw_phy_read(ag->mii_bus, i, MII_BMSR);
-		if(link & BMSR_LSTATUS) {
+	mask = ~as->swdata->phy_poll_mask;
+	for (i = 0; i < AR7240_NUM_PHYS; i++) {
+		int link;
+
+		if (!(mask & BIT(i)))
+			continue;
+
+		link = ar7240sw_phy_read(ag->mii_bus, i, MII_BMSR);
+		if (link & BMSR_LSTATUS) {
 			status = 1;
 			break;
 		}
 	}
 
 	spin_lock_irqsave(&ag->lock, flags);
-	if(status != ag->link) {
+	if (status != ag->link) {
 		ag->link = status;
 		ag71xx_link_adjust(ag);
 	}

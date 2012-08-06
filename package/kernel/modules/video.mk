@@ -8,6 +8,69 @@
 
 VIDEO_MENU:=Video Support
 
+
+define KernelPackage/fb
+  SUBMENU:=$(VIDEO_MENU)
+  TITLE:=Framebuffer support
+  DEPENDS:=@DISPLAY_SUPPORT
+  KCONFIG:=CONFIG_FB
+  FILES:=$(LINUX_DIR)/drivers/video/fb.ko
+  AUTOLOAD:=$(call AutoLoad,06,fb)
+endef
+
+define KernelPackage/fb/description
+  Kernel support for framebuffers
+endef
+
+$(eval $(call KernelPackage,fb))
+
+define KernelPackage/fb-cfb-fillrect
+  SUBMENU:=$(VIDEO_MENU)
+  TITLE:=Framebuffer software rectangle filling support
+  DEPENDS:=+kmod-fb
+  KCONFIG:=CONFIG_FB_CFB_FILLRECT
+  FILES:=$(LINUX_DIR)/drivers/video/cfbfillrect.ko
+  AUTOLOAD:=$(call AutoLoad,07,cfbfillrect)
+endef
+
+define KernelPackage/fb-cfb-fillrect/description
+  Kernel support for software rectangle filling
+endef
+
+$(eval $(call KernelPackage,fb-cfb-fillrect))
+
+
+define KernelPackage/fb-cfb-copyarea
+  SUBMENU:=$(VIDEO_MENU)
+  TITLE:=Framebuffer software copy area support
+  DEPENDS:=+kmod-fb
+  KCONFIG:=CONFIG_FB_CFB_COPYAREA
+  FILES:=$(LINUX_DIR)/drivers/video/cfbcopyarea.ko
+  AUTOLOAD:=$(call AutoLoad,07,cfbcopyarea)
+endef
+
+define KernelPackage/fb-cfb-copyarea/description
+  Kernel support for software copy area
+endef
+
+$(eval $(call KernelPackage,fb-cfb-copyarea))
+
+define KernelPackage/fb-cfb-imgblt
+  SUBMENU:=$(VIDEO_MENU)
+  TITLE:=Framebuffer software image blit support
+  DEPENDS:=+kmod-fb
+  KCONFIG:=CONFIG_FB_CFB_IMAGEBLIT
+  FILES:=$(LINUX_DIR)/drivers/video/cfbimgblt.ko
+  AUTOLOAD:=$(call AutoLoad,07,cfbimgblt)
+endef
+
+define KernelPackage/fb-cfb-imgblt/description
+  Kernel support for software image blitting
+endef
+
+$(eval $(call KernelPackage,fb-cfb-imgblt))
+
+
 define KernelPackage/video-core
   SUBMENU:=$(VIDEO_MENU)
   TITLE=Video4Linux support
@@ -20,19 +83,12 @@ define KernelPackage/video-core
 	CONFIG_VIDEO_CAPTURE_DRIVERS=y \
 	CONFIG_V4L_USB_DRIVERS=y \
 	CONFIG_V4L_PCI_DRIVERS=y \
-	CONFIG_V4L_PLATFORM_DRIVERS=y
-ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),ge,2.6.38)),1)
+	CONFIG_V4L_PLATFORM_DRIVERS=y \
+	CONFIG_V4L_ISA_PARPORT_DRIVERS=y
   FILES:= \
 	$(LINUX_DIR)/drivers/media/video/v4l2-common.ko \
 	$(LINUX_DIR)/drivers/media/video/videodev.ko
   AUTOLOAD:=$(call AutoLoad,60, videodev v4l2-common)
-else
-  FILES:= \
-	$(LINUX_DIR)/drivers/media/video/v4l2-common.ko \
-	$(LINUX_DIR)/drivers/media/video/v4l1-compat.ko \
-	$(LINUX_DIR)/drivers/media/video/videodev.ko
-  AUTOLOAD:=$(call AutoLoad,60, v4l1-compat videodev v4l2-common)
-endif
 endef
 
 define KernelPackage/video-core/description
@@ -46,6 +102,27 @@ define AddDepends/video
   SUBMENU:=$(VIDEO_MENU)
   DEPENDS+=kmod-video-core $(1)
 endef
+
+
+define KernelPackage/video-videobuf2
+  TITLE:=videobuf2 lib
+  KCONFIG:= \
+	CONFIG_VIDEOBUF2_CORE \
+	CONFIG_VIDEOBUF2_MEMOPS \
+	CONFIG_VIDEOBUF2_VMALLOC
+  FILES:= \
+	$(LINUX_DIR)/drivers/media/video/videobuf2-core.ko \
+	$(LINUX_DIR)/drivers/media/video/videobuf2-memops.ko \
+	$(LINUX_DIR)/drivers/media/video/videobuf2-vmalloc.ko
+  AUTOLOAD:=$(call AutoLoad,65,videobuf2-core videobuf2-memops videobuf2-vmalloc)
+  $(call AddDepends/video)
+endef
+
+define KernelPackage/video-videobuf2/description
+ Kernel modules that implements three basic types of media buffers.
+endef
+
+$(eval $(call KernelPackage,video-videobuf2))
 
 
 define KernelPackage/video-cpia2
@@ -62,58 +139,6 @@ define KernelPackage/video-cpia2/description
 endef
 
 $(eval $(call KernelPackage,video-cpia2))
-
-
-define KernelPackage/video-konica
-  TITLE:=Konica USB webcam support
-  DEPENDS:=@USB_SUPPORT +kmod-usb-core
-  KCONFIG:=CONFIG_USB_KONICAWC
-  FILES:=$(LINUX_DIR)/drivers/media/video/usbvideo/konicawc.ko
-  AUTOLOAD:=$(call AutoLoad,70,konicawc)
-  $(call AddDepends/video)
-endef
-
-define KernelPackage/video-konica/description
- Kernel support for webcams based on a Konica chipset. This is known to 
- work with the Intel YC76 webcam.
-endef
-
-$(eval $(call KernelPackage,video-konica))
-
-
-define KernelPackage/video-ov511
-  TITLE:=OV511 USB webcam support
-  DEPENDS:=@USB_SUPPORT +kmod-usb-core
-  KCONFIG:=CONFIG_USB_OV511
-  FILES:=$(LINUX_DIR)/drivers/media/video/ov511.ko
-  AUTOLOAD:=$(call AutoLoad,70,ov511)
-  $(call AddDepends/video)
-endef
-
-
-define KernelPackage/video-ov511/description
- Kernel modules for supporting OmniVision OV511 USB webcams.
-endef
-
-$(eval $(call KernelPackage,video-ov511))
-
-
-define KernelPackage/video-ovcamchip
-  TITLE:=OV6xxx/OV7xxx Camera Chip support
-  DEPENDS:=@USB_SUPPORT +kmod-usb-core
-  KCONFIG:=CONFIG_VIDEO_OVCAMCHIP
-  FILES:=$(LINUX_DIR)/drivers/media/video/ovcamchip/ovcamchip.ko
-  AUTOLOAD:=$(call AutoLoad,70,ovcamchip)
-  $(call AddDepends/video)
-endef
-
-
-define KernelPackage/video-ovcamchip/description
- Kernel modules for supporting OmniVision OV6xxx and OV7xxx series of 
- camera chips.
-endef
-
-$(eval $(call KernelPackage,video-ovcamchip))
 
 
 define KernelPackage/video-sn9c102
@@ -136,7 +161,7 @@ $(eval $(call KernelPackage,video-sn9c102))
 
 define KernelPackage/video-pwc
   TITLE:=Philips USB webcam support
-  DEPENDS:=@USB_SUPPORT +kmod-usb-core
+  DEPENDS:=@USB_SUPPORT +kmod-usb-core +!LINUX_2_6_39:kmod-video-videobuf2
   KCONFIG:= \
 	CONFIG_USB_PWC \
 	CONFIG_USB_PWC_DEBUG=n
@@ -154,7 +179,7 @@ $(eval $(call KernelPackage,video-pwc))
 
 define KernelPackage/video-uvc
   TITLE:=USB Video Class (UVC) support
-  DEPENDS:=@USB_SUPPORT +kmod-usb-core
+  DEPENDS:=@USB_SUPPORT +kmod-usb-core +kmod-video-videobuf2
   KCONFIG:= CONFIG_USB_VIDEO_CLASS
   FILES:=$(LINUX_DIR)/drivers/media/video/uvc/uvcvideo.ko
   AUTOLOAD:=$(call AutoLoad,90,uvcvideo)
@@ -173,7 +198,7 @@ $(eval $(call KernelPackage,video-uvc))
 define KernelPackage/video-gspca-core
   MENU:=1
   TITLE:=GSPCA webcam core support framework
-  DEPENDS:=@USB_SUPPORT +kmod-usb-core
+  DEPENDS:=@USB_SUPPORT +kmod-usb-core +kmod-input-core
   KCONFIG:=CONFIG_USB_GSPCA
   FILES:=$(LINUX_DIR)/drivers/media/video/gspca/gspca_main.ko
   AUTOLOAD:=$(call AutoLoad,70,gspca_main)
@@ -299,6 +324,21 @@ endef
 $(eval $(call KernelPackage,video-gspca-ov534))
 
 
+define KernelPackage/video-gspca-ov534-9
+  TITLE:=ov534-9 webcam support
+  KCONFIG:=CONFIG_USB_GSPCA_OV534_9
+  FILES:=$(LINUX_DIR)/drivers/media/video/gspca/gspca_ov534_9.ko
+  AUTOLOAD:=$(call AutoLoad,75,gspca_ov534_9)
+  $(call AddDepends/video-gspca)
+endef
+
+define KernelPackage/video-gspca-ov534-9/description
+ The OV534-9 USB Camera Driver (ov534_9) kernel module.
+endef
+
+$(eval $(call KernelPackage,video-gspca-ov534-9))
+
+
 define KernelPackage/video-gspca-pac207
   TITLE:=pac207 webcam support
   KCONFIG:=CONFIG_USB_GSPCA_PAC207
@@ -329,11 +369,26 @@ endef
 $(eval $(call KernelPackage,video-gspca-pac7311))
 
 
+define KernelPackage/video-gspca-se401
+  TITLE:=se401 webcam support
+  KCONFIG:=CONFIG_USB_GSPCA_SE401
+  FILES:=$(LINUX_DIR)/drivers/media/video/gspca/gspca_se401.ko
+  AUTOLOAD:=$(call AutoLoad,75,gspca_se401)
+  $(call AddDepends/video-gspca)
+endef
+
+define KernelPackage/video-gspca-se401/description
+ The SE401 USB Camera Driver kernel module.
+endef
+
+$(eval $(call KernelPackage,video-gspca-se401))
+
+
 define KernelPackage/video-gspca-sn9c20x
   TITLE:=sn9c20x webcam support
   KCONFIG:=CONFIG_USB_GSPCA_SN9C20X
   FILES:=$(LINUX_DIR)/drivers/media/video/gspca/gspca_sn9c20x.ko
-  AUTOLOAD:=$(call AutoLoad,75,sn9c20x)
+  AUTOLOAD:=$(call AutoLoad,75,gspca_sn9c20x)
   $(call AddDepends/video-gspca)
 endef
 
@@ -616,7 +671,6 @@ $(eval $(call KernelPackage,video-gspca-stv06xx))
 
 define KernelPackage/video-gspca-gl860
   TITLE:=gl860 webcam support
-  DEPENDS:=@LINUX_2_6_32
   KCONFIG:=CONFIG_USB_GL860
   FILES:=$(LINUX_DIR)/drivers/media/video/gspca/gl860/gspca_gl860.ko
   AUTOLOAD:=$(call AutoLoad,75,gspca_gl860)
@@ -632,7 +686,6 @@ $(eval $(call KernelPackage,video-gspca-gl860))
 
 define KernelPackage/video-gspca-jeilinj
   TITLE:=jeilinj webcam support
-  DEPENDS:=@LINUX_2_6_32
   KCONFIG:=CONFIG_USB_GSPCA_JEILINJ
   FILES:=$(LINUX_DIR)/drivers/media/video/gspca/gspca_jeilinj.ko
   AUTOLOAD:=$(call AutoLoad,75,gspca_jeilinj)
@@ -644,3 +697,18 @@ define KernelPackage/video-gspca-jeilinj/description
 endef
 
 $(eval $(call KernelPackage,video-gspca-jeilinj))
+
+
+define KernelPackage/video-gspca-konica
+  TITLE:=konica webcam support
+  KCONFIG:=CONFIG_USB_GSPCA_KONICA
+  FILES:=$(LINUX_DIR)/drivers/media/video/gspca/gspca_konica.ko
+  AUTOLOAD:=$(call AutoLoad,75,gspca_konica)
+  $(call AddDepends/video-gspca)
+endef
+
+define KernelPackage/video-gspca-konica/description
+ The Konica USB Camera Driver (konica) kernel module.
+endef
+
+$(eval $(call KernelPackage,video-gspca-konica))

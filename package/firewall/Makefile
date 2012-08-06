@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=firewall
 
 PKG_VERSION:=2
-PKG_RELEASE:=45
+PKG_RELEASE:=53
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -19,7 +19,7 @@ define Package/firewall
   URL:=http://openwrt.org/
   TITLE:=OpenWrt firewall
   MAINTAINER:=Jo-Philipp Wich <xm@subsignal.org>
-  DEPENDS:=+iptables +iptables-mod-conntrack +iptables-mod-nat
+  DEPENDS:=+iptables +kmod-ipt-conntrack +kmod-ipt-nat
   PKGARCH:=all
 endef
 

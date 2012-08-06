@@ -22,15 +22,16 @@
 void __iomem * rt3883_sysc_base;
 void __iomem * rt3883_memc_base;
 
-void __init rt3883_detect_sys_type(void)
+void __init ramips_soc_prom_init(void)
 {
+	void __iomem *sysc = (void __iomem *) KSEG1ADDR(RT3883_SYSC_BASE);
 	u32 n0;
 	u32 n1;
 	u32 id;
 
-	n0 = rt3883_sysc_rr(RT3883_SYSC_REG_CHIPID0_3);
-	n1 = rt3883_sysc_rr(RT3883_SYSC_REG_CHIPID4_7);
-	id = rt3883_sysc_rr(RT3883_SYSC_REG_REVID);
+	n0 = __raw_readl(sysc + RT3883_SYSC_REG_CHIPID0_3);
+	n1 = __raw_readl(sysc + RT3883_SYSC_REG_CHIPID4_7);
+	id = __raw_readl(sysc + RT3883_SYSC_REG_REVID);
 
 	snprintf(ramips_sys_type, RAMIPS_SYS_TYPE_LEN,
 		"Ralink %c%c%c%c%c%c%c%c ver:%u eco:%u",
@@ -40,6 +41,10 @@ void __init rt3883_detect_sys_type(void)
 		(char) ((n1 >> 16) & 0xff), (char) ((n1 >> 24) & 0xff),
 		(id >> RT3883_REVID_VER_ID_SHIFT) & RT3883_REVID_VER_ID_MASK,
 		(id & RT3883_REVID_ECO_ID_MASK));
+
+	ramips_mem_base = RT3883_SDRAM_BASE;
+	ramips_mem_size_min = RT3883_MEM_SIZE_MIN;
+	ramips_mem_size_max = RT3883_MEM_SIZE_MAX;
 }
 
 static struct ramips_gpio_chip rt3883_gpio_chips[] = {
@@ -151,7 +156,7 @@ void __init rt3883_gpio_init(u32 mode)
 		rt3883_gpio_reserve(RT3883_GPIO_I2C_SD, RT3883_GPIO_I2C_SCLK);
 
 	if ((mode & RT3883_GPIO_MODE_SPI) == 0)
-		rt3883_gpio_reserve(RT3883_GPIO_SPI_CS0, RT3883_GPIO_SPI_CLK);
+		rt3883_gpio_reserve(RT3883_GPIO_SPI_CS0, RT3883_GPIO_SPI_MISO);
 
 	t = mode >> RT3883_GPIO_MODE_UART0_SHIFT;
 	t &= RT3883_GPIO_MODE_UART0_MASK;

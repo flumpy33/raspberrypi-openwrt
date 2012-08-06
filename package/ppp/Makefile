@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2011 OpenWrt.org
+# Copyright (C) 2006-2012 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -10,7 +10,7 @@ include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=ppp
 PKG_VERSION:=2.4.5
-PKG_RELEASE:=4
+PKG_RELEASE:=6
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=ftp://ftp.samba.org/pub/ppp/
@@ -95,6 +95,26 @@ define Package/ppp-mod-radius/conffiles
 /etc/ppp/radius/
 endef
 
+define Package/ppp-mod-pppol2tp
+$(call Package/ppp/Default)
+  DEPENDS:=@(PACKAGE_ppp||PACKAGE_ppp-multilink) +kmod-pppol2tp
+  TITLE:=PPPoL2TP plugin
+endef
+
+define Package/ppp-mod-pppol2tp/description
+This package contains a PPPoL2TP (PPP over L2TP) plugin for ppp.
+endef
+
+define Package/ppp-mod-pptp
+$(call Package/ppp/Default)
+  DEPENDS:=@(PACKAGE_ppp||PACKAGE_ppp-multilink) +kmod-pptp +kmod-mppe +resolveip
+  TITLE:=PPtP plugin
+endef
+
+define Package/ppp-mod-pptp/description
+This package contains a PPtP plugin for ppp.
+endef
+
 define Package/chat
 $(call Package/ppp/Default)
   DEPENDS:=@(PACKAGE_ppp||PACKAGE_ppp-multilink)
@@ -156,23 +176,22 @@ define Build/InstallDev
 	$(CP) $(PKG_INSTALL_DIR)/include/pppd $(1)/usr/include/
 endef
 
+define Package/ppp/script_install
+endef
+
 define Package/ppp/install
 	$(INSTALL_DIR) $(1)/usr/lib/pppd/$(PKG_VERSION)
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/sbin/pppd $(1)/usr/sbin/
-	$(INSTALL_DIR) $(1)/lib/network
-	$(INSTALL_BIN) ./files/ppp.sh $(1)/lib/network/
 	$(INSTALL_DIR) $(1)/etc/ppp
 	$(INSTALL_CONF) ./files/etc/ppp/chap-secrets $(1)/etc/ppp/
 	$(INSTALL_DATA) ./files/etc/ppp/filter $(1)/etc/ppp/
-	$(INSTALL_BIN) ./files/etc/ppp/ip-up $(1)/etc/ppp/
-	$(INSTALL_DIR) $(1)/etc/ppp/ip-up.d
-	$(INSTALL_BIN) ./files/etc/ppp/ip-down $(1)/etc/ppp/
-	$(INSTALL_DIR) $(1)/etc/ppp/ip-down.d
-	$(INSTALL_BIN) ./files/etc/ppp/ipv6-up $(1)/etc/ppp/
-	$(INSTALL_BIN) ./files/etc/ppp/ipv6-down $(1)/etc/ppp/
 	$(INSTALL_DATA) ./files/etc/ppp/options $(1)/etc/ppp/
 	ln -sf /tmp/resolv.conf.ppp $(1)/etc/ppp/resolv.conf
+	$(INSTALL_DIR) $(1)/lib/netifd/proto
+	$(INSTALL_BIN) ./files/ppp.sh $(1)/lib/netifd/proto/
+	$(INSTALL_BIN) ./files/lib/netifd/ppp-up $(1)/lib/netifd/
+	$(INSTALL_BIN) ./files/lib/netifd/ppp-down $(1)/lib/netifd/
 endef
 Package/ppp-multilink/install=$(Package/ppp/install)
 
@@ -180,18 +199,12 @@ define Package/ppp-mod-pppoa/install
 	$(INSTALL_DIR) $(1)/usr/lib/pppd/$(PKG_VERSION)
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/lib/pppd/$(PKG_VERSION)/pppoatm.so \
 		$(1)/usr/lib/pppd/$(PKG_VERSION)/
-	$(INSTALL_DIR) $(1)/lib/network
-	$(INSTALL_BIN) ./files/pppoa.sh $(1)/lib/network/
-	$(INSTALL_DIR) $(1)/etc/hotplug.d/atm
-	$(INSTALL_DATA) ./files/etc/hotplug.d/atm/20-atm-modem $(1)/etc/hotplug.d/atm/
 endef
 
 define Package/ppp-mod-pppoe/install
 	$(INSTALL_DIR) $(1)/usr/lib/pppd/$(PKG_VERSION)
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/lib/pppd/$(PKG_VERSION)/rp-pppoe.so \
 		$(1)/usr/lib/pppd/$(PKG_VERSION)/
-	$(INSTALL_DIR) $(1)/lib/network
-	$(INSTALL_BIN) ./files/pppoe.sh $(1)/lib/network/
 endef
 
 define Package/ppp-mod-radius/install
@@ -205,6 +218,20 @@ define Package/ppp-mod-radius/install
 		$(1)/etc/ppp/radius/
 	$(INSTALL_CONF) ./files/etc/ppp/radius/servers \
 		$(1)/etc/ppp/radius/
+endef
+
+define Package/ppp-mod-pppol2tp/install
+	$(INSTALL_DIR) $(1)/usr/lib/pppd/$(PKG_VERSION)
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/lib/pppd/$(PKG_VERSION)/pppol2tp.so \
+		$(1)/usr/lib/pppd/$(PKG_VERSION)/
+endef
+
+define Package/ppp-mod-pptp/install
+	$(INSTALL_DIR) $(1)/usr/lib/pppd/$(PKG_VERSION)
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/lib/pppd/$(PKG_VERSION)/pptp.so \
+		$(1)/usr/lib/pppd/$(PKG_VERSION)/
+	$(INSTALL_DIR) $(1)/etc/ppp
+	$(INSTALL_DATA) ./files/etc/ppp/options.pptp $(1)/etc/ppp/
 endef
 
 define Package/chat/install
@@ -227,6 +254,8 @@ $(eval $(call BuildPackage,ppp-multilink))
 $(eval $(call BuildPackage,ppp-mod-pppoa))
 $(eval $(call BuildPackage,ppp-mod-pppoe))
 $(eval $(call BuildPackage,ppp-mod-radius))
+$(eval $(call BuildPackage,ppp-mod-pppol2tp))
+$(eval $(call BuildPackage,ppp-mod-pptp))
 $(eval $(call BuildPackage,chat))
 $(eval $(call BuildPackage,pppdump))
 $(eval $(call BuildPackage,pppstats))

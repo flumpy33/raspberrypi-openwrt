@@ -79,7 +79,12 @@ define Host/Compile
 endef
 
 define Host/Install
-	$(MAKE) -C $(HOST_BUILD_DIR) install
+	mkdir -p $(TOOLCHAIN_DIR)/initial
+	$(MAKE) -C $(HOST_BUILD_DIR) \
+		prefix=$(TOOLCHAIN_DIR)/initial \
+		install
+	$(call FixupLibdir,$(TOOLCHAIN_DIR)/initial)
+	$(CP) $(TOOLCHAIN_DIR)/initial/. $(TOOLCHAIN_DIR)/
 	$(CP) $(TOOLCHAIN_DIR)/bin/$(REAL_GNU_TARGET_NAME)-readelf $(REAL_STAGING_DIR_HOST)/bin/readelf
 endef
 

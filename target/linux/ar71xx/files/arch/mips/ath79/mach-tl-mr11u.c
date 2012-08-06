@@ -84,6 +84,8 @@ static void __init tl_mr11u_setup(void)
 	u8 *mac = (u8 *) KSEG1ADDR(0x1f01fc00);
 	u8 *ee = (u8 *) KSEG1ADDR(0x1fff1000);
 
+	ath79_setup_ar933x_phy4_switch(false, true);
+
 	ath79_register_m25p80(&tl_mr11u_flash_data);
 	ath79_register_leds_gpio(-1, ARRAY_SIZE(tl_mr11u_leds_gpio),
 				 tl_mr11u_leds_gpio);
@@ -91,14 +93,15 @@ static void __init tl_mr11u_setup(void)
 					ARRAY_SIZE(tl_mr11u_gpio_keys),
 					tl_mr11u_gpio_keys);
 
-	gpio_request(TL_MR11U_GPIO_USB_POWER, "USB power");
-	gpio_direction_output(TL_MR11U_GPIO_USB_POWER, 1);
+	ath79_set_usb_power_gpio(TL_MR11U_GPIO_USB_POWER, GPIOF_OUT_INIT_HIGH,
+				"USB power");
 	ath79_register_usb();
 
 	ath79_init_mac(ath79_eth0_data.mac_addr, mac, 0);
 
 	ath79_register_mdio(0, 0x0);
 	ath79_register_eth(0);
+	ath79_eth0_data.phy_mask = BIT(0);
 
 	ath79_register_wmac(ee, mac);
 }

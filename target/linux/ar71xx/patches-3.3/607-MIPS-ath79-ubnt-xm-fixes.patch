@@ -1,6 +1,6 @@
 --- a/arch/mips/ath79/Kconfig
 +++ b/arch/mips/ath79/Kconfig
-@@ -57,9 +57,10 @@ config ATH79_MACH_PB44
+@@ -69,9 +69,10 @@ config ATH79_MACH_PB44
  config ATH79_MACH_UBNT_XM
  	bool "Ubiquiti Networks XM (rev 1.0) board"
  	select SOC_AR724X
@@ -42,8 +42,8 @@
  };
  
 -static struct ath79_spi_controller_data ubnt_xm_spi0_data = {
--       .cs_type = ATH79_SPI_CS_TYPE_INTERNAL,
--       .cs_line = 0,
+-	.cs_type = ATH79_SPI_CS_TYPE_INTERNAL,
+-	.cs_line = 0,
 -};
 -
 -static struct spi_board_info ubnt_xm_spi_info[] = {

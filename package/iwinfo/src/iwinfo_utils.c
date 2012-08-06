@@ -145,8 +145,182 @@ struct iwinfo_hardware_entry * iwinfo_hardware(struct iwinfo_hardware_id *id)
 			(e->subsystem_device_id != id->subsystem_device_id))
 			continue;
 
-		return e;
+		return (struct iwinfo_hardware_entry *)e;
 	}
 
 	return NULL;
+}
+
+int iwinfo_hardware_id_from_mtd(struct iwinfo_hardware_id *id)
+{
+	FILE *mtd;
+	uint16_t *bc;
+
+	int fd, len, off;
+	char buf[128];
+
+	if (!(mtd = fopen("/proc/mtd", "r")))
+		return -1;
+
+	while (fgets(buf, sizeof(buf), mtd) > 0)
+	{
+		if (fscanf(mtd, "mtd%d: %*x %x %127s", &off, &len, buf) < 3 ||
+		    (strcmp(buf, "\"boardconfig\"") && strcmp(buf, "\"EEPROM\"")))
+		{
+			off = -1;
+			continue;
+		}
+
+		break;
+	}
+
+	fclose(mtd);
+
+	if (off < 0)
+		return -1;
+
+	snprintf(buf, sizeof(buf), "/dev/mtdblock%d", off);
+
+	if ((fd = open(buf, O_RDONLY)) < 0)
+		return -1;
+
+	bc = mmap(NULL, len, PROT_READ, MAP_PRIVATE|MAP_LOCKED, fd, 0);
+
+	if ((void *)bc != MAP_FAILED)
+	{
+		id->vendor_id = 0;
+		id->device_id = 0;
+
+		for (off = len / 2 - 0x800; off >= 0; off -= 0x800)
+		{
+			/* AR531X board data magic */
+			if ((bc[off] == 0x3533) && (bc[off + 1] == 0x3131))
+			{
+				id->vendor_id = bc[off + 0x7d];
+				id->device_id = bc[off + 0x7c];
+				id->subsystem_vendor_id = bc[off + 0x84];
+				id->subsystem_device_id = bc[off + 0x83];
+				break;
+			}
+
+			/* AR5416 EEPROM magic */
+			else if ((bc[off] == 0xA55A) || (bc[off] == 0x5AA5))
+			{
+				id->vendor_id = bc[off + 0x0D];
+				id->device_id = bc[off + 0x0E];
+				id->subsystem_vendor_id = bc[off + 0x13];
+				id->subsystem_device_id = bc[off + 0x14];
+				break;
+			}
+		}
+
+		munmap(bc, len);
+	}
+
+	close(fd);
+
+	return (id->vendor_id && id->device_id) ? 0 : -1;
+}
+
+void iwinfo_parse_rsn(struct iwinfo_crypto_entry *c, uint8_t *data, uint8_t len,
+					  uint8_t defcipher, uint8_t defauth)
+{
+	uint16_t i, count;
+
+	static unsigned char ms_oui[3]        = { 0x00, 0x50, 0xf2 };
+	static unsigned char ieee80211_oui[3] = { 0x00, 0x0f, 0xac };
+
+	data += 2;
+	len -= 2;
+
+	if (!memcmp(data, ms_oui, 3))
+		c->wpa_version += 1;
+	else if (!memcmp(data, ieee80211_oui, 3))
+		c->wpa_version += 2;
+
+	if (len < 4)
+	{
+		c->group_ciphers |= defcipher;
+		c->pair_ciphers  |= defcipher;
+		c->auth_suites   |= defauth;
+		return;
+	}
+
+	if (!memcmp(data, ms_oui, 3) || !memcmp(data, ieee80211_oui, 3))
+	{
+		switch (data[3])
+		{
+			case 1: c->group_ciphers |= IWINFO_CIPHER_WEP40;  break;
+			case 2: c->group_ciphers |= IWINFO_CIPHER_TKIP;   break;
+			case 4: c->group_ciphers |= IWINFO_CIPHER_CCMP;   break;
+			case 5: c->group_ciphers |= IWINFO_CIPHER_WEP104; break;
+			case 6:  /* AES-128-CMAC */ break;
+			default: /* proprietary */  break;
+		}
+	}
+
+	data += 4;
+	len -= 4;
+
+	if (len < 2)
+	{
+		c->pair_ciphers |= defcipher;
+		c->auth_suites  |= defauth;
+		return;
+	}
+
+	count = data[0] | (data[1] << 8);
+	if (2 + (count * 4) > len)
+		return;
+
+	for (i = 0; i < count; i++)
+	{
+		if (!memcmp(data + 2 + (i * 4), ms_oui, 3) ||
+			!memcmp(data + 2 + (i * 4), ieee80211_oui, 3))
+		{
+			switch (data[2 + (i * 4) + 3])
+			{
+				case 1: c->pair_ciphers |= IWINFO_CIPHER_WEP40;  break;
+				case 2: c->pair_ciphers |= IWINFO_CIPHER_TKIP;   break;
+				case 4: c->pair_ciphers |= IWINFO_CIPHER_CCMP;   break;
+				case 5: c->pair_ciphers |= IWINFO_CIPHER_WEP104; break;
+				case 6:  /* AES-128-CMAC */ break;
+				default: /* proprietary */  break;
+			}
+		}
+	}
+
+	data += 2 + (count * 4);
+	len -= 2 + (count * 4);
+
+	if (len < 2)
+	{
+		c->auth_suites |= defauth;
+		return;
+	}
+
+	count = data[0] | (data[1] << 8);
+	if (2 + (count * 4) > len)
+		return;
+
+	for (i = 0; i < count; i++)
+	{
+		if (!memcmp(data + 2 + (i * 4), ms_oui, 3) ||
+			!memcmp(data + 2 + (i * 4), ieee80211_oui, 3))
+		{
+			switch (data[2 + (i * 4) + 3])
+			{
+				case 1: c->auth_suites |= IWINFO_KMGMT_8021x; break;
+				case 2: c->auth_suites |= IWINFO_KMGMT_PSK;   break;
+				case 3:  /* FT/IEEE 802.1X */                 break;
+				case 4:  /* FT/PSK */                         break;
+				case 5:  /* IEEE 802.1X/SHA-256 */            break;
+				case 6:  /* PSK/SHA-256 */                    break;
+				default: /* proprietary */                    break;
+			}
+		}
+	}
+
+	data += 2 + (count * 4);
+	len -= 2 + (count * 4);
 }

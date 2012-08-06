@@ -16,8 +16,6 @@
 #include <linux/init.h>
 #include <linux/io.h>
 
-void rt3883_detect_sys_type(void);
-
 #define RT3883_MEM_SIZE_MIN (2 * 1024 * 1024)
 #define RT3883_MEM_SIZE_MAX (256 * 1024 * 1024)
 
@@ -149,7 +147,6 @@ void rt3883_pci_set_plat_dev_init(int (*f)(struct pci_dev *));
 #else
 static inline void rt3883_pci_init(unsigned mode) {}
 static inline void rt3883_pci_set_plat_dev_init(int (*f)(struct pci_dev *)) {}
-}
 #endif /* CONFIG_PCI */
 
 #endif /* _RT3883_H_ */

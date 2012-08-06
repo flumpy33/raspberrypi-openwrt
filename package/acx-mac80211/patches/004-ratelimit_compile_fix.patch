@@ -1,7 +1,7 @@
 --- a/common.c
 +++ b/common.c
-@@ -31,6 +31,7 @@
- #include <linux/ethtool.h>
+@@ -34,6 +34,7 @@
+ #include <linux/pci.h>
  #include <linux/nl80211.h>
  #include <linux/ieee80211.h>
 +#include <linux/ratelimit.h>

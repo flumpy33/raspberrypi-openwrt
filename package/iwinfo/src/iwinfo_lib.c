@@ -44,6 +44,14 @@ const char *IWINFO_AUTH_NAMES[] = {
 	"SHARED",
 };
 
+const char *IWINFO_OPMODE_NAMES[] = {
+	"Unknown",
+	"Master",
+	"Ad-Hoc",
+	"Client",
+	"Monitor",
+};
+
 
 /*
  * ISO3166 country labels
@@ -315,6 +323,8 @@ const struct iwinfo_hardware_entry IWINFO_HARDWARE_ENTRIES[] = {
 	{ VENDOR_UBNT, "PowerStation2 (EXT)", 	0xffff, 0xffff, 0xffff, 0xb302,  0,     0 },
 	{ VENDOR_UBNT, "PowerStation5 (22V)", 	0xffff, 0xffff, 0xffff, 0xb105,  0,     0 },
 	{ VENDOR_UBNT, "PowerStation5 (EXT)", 	0xffff, 0xffff, 0xffff, 0xb305,  0,     0 },
+	{ VENDOR_UBNT, "PicoStation2",        	0xffff, 0xffff, 0xffff, 0xc302,  0,     0 },
+	{ VENDOR_UBNT, "PicoStation2 HP",     	0xffff, 0xffff, 0xffff, 0xc3a2, 10,     0 },
 	{ VENDOR_UBNT, "WispStation5",        	0xffff, 0xffff, 0xffff, 0xa105,  0,     0 },
 	{ VENDOR_UBNT, "LiteStation2",        	0xffff, 0xffff, 0xffff, 0xa002, 10,     0 },
 	{ VENDOR_UBNT, "LiteStation5",        	0xffff, 0xffff, 0xffff, 0xa005,  5,     0 },
@@ -348,10 +358,11 @@ const struct iwinfo_hardware_entry IWINFO_HARDWARE_ENTRIES[] = {
 	{ VENDOR_UBNT, "SR71",                  0x168c, 0x0027, 0x0777, 0x4082, 10,     0 },
 #endif
 #ifdef USE_NL80211
-	{ VENDOR_UBNT, "NanoStation M2",        0x168c, 0x002a, 0x0777, 0xe012, 10,     0 }, /* ToDo: confirm offset */
+	{ VENDOR_UBNT, "PicoStation M2",        0x168c, 0x002a, 0x0777, 0xe302, 12,     0 }, /* ToDo: confirm offset */
+	{ VENDOR_UBNT, "NanoStation M2",        0x168c, 0x002a, 0x0777, 0xe012, 12,     0 }, /* ToDo: confirm offset */
 	{ VENDOR_UBNT, "NanoStation M5",        0x168c, 0x002a, 0x0777, 0xe005,  5,     0 }, /* ToDo: confirm offset */
 	{ VENDOR_UBNT, "Bullet M2",             0x168c, 0x002a, 0x0777, 0xe202, 12,     0 },
-	{ VENDOR_UBNT, "Bullet M5",             0x168c, 0x002a, 0x0777, 0xe205,  5,     0 },
+	{ VENDOR_UBNT, "Bullet M5",             0x168c, 0x002a, 0x0777, 0xe805,  5,     0 },
 
 	{ VENDOR_ATH,  "AR9220",                0x168c, 0x0029, 0x168c, 0xa094,  0,     0 },
 	{ VENDOR_ATH,  "AR9223",                0x168c, 0x0029, 0x168c, 0xa095,  0,     0 },

@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2010 OpenWrt.org
+# Copyright (C) 2006-2012 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -108,6 +108,23 @@ endef
 $(eval $(call KernelPackage,ac97))
 
 
+define KernelPackage/sound-seq
+  TITLE:=Sequencer support
+  FILES:= \
+	$(LINUX_DIR)/sound/core/seq/snd-seq.ko \
+	$(LINUX_DIR)/sound/core/seq/snd-seq-midi-event.ko \
+	$(LINUX_DIR)/sound/core/seq/snd-seq-midi.ko
+  AUTOLOAD:=$(call AutoLoad,35,snd-seq snd-seq-midi-event snd-seq-midi)
+  $(call AddDepends/sound)
+endef
+
+define KernelPackage/sound-seq/description
+ Kernel modules for sequencer support
+endef
+
+$(eval $(call KernelPackage,sound-seq))
+
+
 define KernelPackage/sound-i8x0
   TITLE:=Intel/SiS/nVidia/AMD/ALi AC97 Controller
   DEPENDS:=+kmod-ac97
@@ -155,42 +172,13 @@ endef
 $(eval $(call KernelPackage,sound-soc-core))
 
 
-define KernelPackage/sound-soc-omap
-  TITLE:=OMAP SoC sound support
-  KCONFIG:= \
-	CONFIG_SND_OMAP_SOC
-  FILES:=$(LINUX_DIR)/sound/soc/omap/snd-soc-omap.ko
-  AUTOLOAD:=$(call AutoLoad,60,snd-soc-omap)
-  DEPENDS:=@TARGET_omap24xx +kmod-sound-soc-core
+define KernelPackage/sound-soc-ac97
+  TITLE:=AC97 Codec support
+  KCONFIG:=CONFIG_SND_SOC_AC97_CODEC
+  FILES:=$(LINUX_DIR)/sound/soc/codecs/snd-soc-ac97.ko
+  AUTOLOAD:=$(call AutoLoad,57,snd-soc-ac97)
+  DEPENDS:=+kmod-ac97 +kmod-sound-soc-core
   $(call AddDepends/sound)
 endef
 
-$(eval $(call KernelPackage,sound-soc-omap))
-
-
-define KernelPackage/sound-soc-omap-mcbsp
-  TITLE:=OMAP SoC MCBSP support
-  KCONFIG:= \
-	CONFIG_SND_OMAP_SOC_MCBSP
-  FILES:=$(LINUX_DIR)/sound/soc/omap/snd-soc-omap-mcbsp.ko
-  AUTOLOAD:=$(call AutoLoad,61,snd-soc-omap-mcbsp)
-  DEPENDS:=@TARGET_omap24xx +kmod-sound-soc-omap
-  $(call AddDepends/sound)
-endef
-
-$(eval $(call KernelPackage,sound-soc-omap-mcbsp))
-
-
-define KernelPackage/sound-soc-n810
-  TITLE:=Nokia n810 SoC sound support
-  KCONFIG:= \
-	CONFIG_SND_OMAP_SOC_N810
-  FILES:= \
-	$(LINUX_DIR)/sound/soc/codecs/snd-soc-tlv320aic3x.ko \
-	$(LINUX_DIR)/sound/soc/omap/snd-soc-n810.ko
-  AUTOLOAD:=$(call AutoLoad,65,snd-soc-tlv320aic3x snd-soc-n810)
-  DEPENDS:=@TARGET_omap24xx +kmod-sound-soc-omap +kmod-sound-soc-omap-mcbsp
-  $(call AddDepends/sound)
-endef
-
-$(eval $(call KernelPackage,sound-soc-n810))
+$(eval $(call KernelPackage,sound-soc-ac97))

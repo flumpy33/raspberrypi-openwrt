@@ -51,9 +51,9 @@
 #define AG71XX_INT_INIT	(AG71XX_INT_ERR | AG71XX_INT_POLL)
 
 #define AG71XX_TX_MTU_LEN	1540
-#define AG71XX_RX_PKT_RESERVE	64
 #define AG71XX_RX_PKT_SIZE	\
-	(AG71XX_RX_PKT_RESERVE + ETH_FRAME_LEN + ETH_FCS_LEN + VLAN_HLEN)
+	(ETH_FRAME_LEN + ETH_FCS_LEN + VLAN_HLEN)
+#define AG71XX_RX_BUF_SIZE (AG71XX_RX_PKT_SIZE + NET_SKB_PAD + NET_IP_ALIGN)
 
 #define AG71XX_TX_RING_SIZE_DEFAULT	64
 #define AG71XX_RX_RING_SIZE_DEFAULT	128
@@ -86,7 +86,10 @@ struct ag71xx_desc {
 } __attribute__((aligned(4)));
 
 struct ag71xx_buf {
-	struct sk_buff		*skb;
+	union {
+		struct sk_buff	*skb;
+		void		*rx_buf;
+	};
 	struct ag71xx_desc	*desc;
 	dma_addr_t		dma_addr;
 	unsigned long		timestamp;
@@ -323,6 +326,14 @@ static inline int ag71xx_desc_pktlen(struct ag71xx_desc *desc)
 #define MII_CFG_CLK_DIV_14	5
 #define MII_CFG_CLK_DIV_20	6
 #define MII_CFG_CLK_DIV_28	7
+#define MII_CFG_CLK_DIV_34	8
+#define MII_CFG_CLK_DIV_42	9
+#define MII_CFG_CLK_DIV_50	10
+#define MII_CFG_CLK_DIV_58	11
+#define MII_CFG_CLK_DIV_66	12
+#define MII_CFG_CLK_DIV_74	13
+#define MII_CFG_CLK_DIV_82	14
+#define MII_CFG_CLK_DIV_98	15
 #define MII_CFG_RESET		BIT(31)
 
 #define MII_CMD_WRITE		0x0

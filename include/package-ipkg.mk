@@ -47,6 +47,44 @@ dep_val=$(word 2,$(call dep_split,$(1)))
 strip_deps=$(strip $(subst +,,$(filter-out @%,$(1))))
 filter_deps=$(foreach dep,$(call strip_deps,$(1)),$(if $(findstring :,$(dep)),$(call dep_if,$(dep)),$(dep)))
 
+define AddDependency
+  $$(if $(1),$$(if $(2),$$(foreach pkg,$(1),$$(IPKG_$$(pkg))): $$(foreach pkg,$(2),$$(IPKG_$$(pkg)))))
+endef
+
+define FixupReverseDependencies
+  DEPS := $$(filter %:$(1),$$(IDEPEND))
+  DEPS := $$(patsubst %:$(1),%,$$(DEPS))
+  DEPS := $$(filter $$(DEPS),$$(IPKGS))
+  $(call AddDependency,$$(DEPS),$(1))
+endef
+
+define FixupDependencies
+  DEPS := $$(filter $(1):%,$$(IDEPEND))
+  DEPS := $$(patsubst $(1):%,%,$$(DEPS))
+  DEPS := $$(filter $$(DEPS),$$(IPKGS))
+  $(call AddDependency,$(1),$$(DEPS))
+endef
+
+ifneq ($(PKG_NAME),toolchain)
+  define CheckDependencies
+	@( \
+		rm -f $(PKG_INFO_DIR)/$(1).missing; \
+		( \
+			export READELF=$(TARGET_CROSS)readelf XARGS="$(XARGS)"; \
+			$(SCRIPT_DIR)/gen-dependencies.sh "$$(IDIR_$(1))"; \
+		) | while read FILE; do \
+			grep -q "$$$$FILE" $(PKG_INFO_DIR)/$(1).provides || \
+				echo "$$$$FILE" >> $(PKG_INFO_DIR)/$(1).missing; \
+		done; \
+		if [ -f "$(PKG_INFO_DIR)/$(1).missing" ]; then \
+			echo "Package $(1) is missing dependencies for the following libraries:"; \
+			cat "$(PKG_INFO_DIR)/$(1).missing"; \
+			false; \
+		fi; \
+	)
+  endef
+endif
+
 ifeq ($(DUMP),)
   define BuildTarget/ipkg
     IPKG_$(1):=$(PACKAGE_DIR)/$(1)_$(VERSION)_$(PKGARCH).ipk
@@ -57,7 +95,8 @@ ifeq ($(DUMP),)
     ifeq ($(if $(VARIANT),$(BUILD_VARIANT)),$(VARIANT))
     ifdef Package/$(1)/install
       ifneq ($(CONFIG_PACKAGE_$(1))$(SDK)$(DEVELOPER),)
-        compile: $$(IPKG_$(1)) $(STAGING_DIR_ROOT)/stamp/.$(1)_installed
+        IPKGS += $(1)
+        compile: $$(IPKG_$(1)) $(PKG_INFO_DIR)/$(1).provides $(STAGING_DIR_ROOT)/stamp/.$(1)_installed
 
         ifeq ($(CONFIG_PACKAGE_$(1)),y)
           install: $$(INFO_$(1))
@@ -70,7 +109,11 @@ ifeq ($(DUMP),)
     endif
     endif
 
+    DEPENDS:=$(call PKG_FIXUP_DEPENDS,$(1),$(DEPENDS))
     IDEPEND_$(1):=$$(call filter_deps,$$(DEPENDS))
+    IDEPEND += $$(patsubst %,$(1):%,$$(IDEPEND_$(1)))
+    $(FixupDependencies)
+    $(FixupReverseDependencies)
 
     $(eval $(call BuildIPKGVariable,$(1),conffiles))
     $(eval $(call BuildIPKGVariable,$(1),preinst))
@@ -87,11 +130,23 @@ ifeq ($(DUMP),)
 	rm -rf $(STAGING_DIR_ROOT)/tmp-$(1)
 	touch $$@
 
-    $$(IPKG_$(1)): $(STAMP_BUILT)
+    $(PKG_INFO_DIR)/$(1).provides: $$(IPKG_$(1))
+    $$(IPKG_$(1)): $(STAMP_BUILT) $(INCLUDE_DIR)/package-ipkg.mk
 	@rm -rf $(PACKAGE_DIR)/$(1)_* $$(IDIR_$(1))
-	mkdir -p $(PACKAGE_DIR) $$(IDIR_$(1))/CONTROL
+	mkdir -p $(PACKAGE_DIR) $$(IDIR_$(1))/CONTROL $(PKG_INFO_DIR)
 	$(call Package/$(1)/install,$$(IDIR_$(1)))
 	-find $$(IDIR_$(1)) -name 'CVS' -o -name '.svn' -o -name '.#*' -o -name '*~'| $(XARGS) rm -rf
+	@( \
+		find $$(IDIR_$(1)) -name lib\*.so\* | awk -F/ '{ print $$$$NF }'; \
+		for file in $$(patsubst %,$(PKG_INFO_DIR)/%.provides,$$(IDEPEND_$(1))); do \
+			if [ -f "$$$$file" ]; then \
+				cat $$$$file; \
+			fi; \
+		done; \
+	) | sort -u > $(PKG_INFO_DIR)/$(1).provides
+	$(if $(PROVIDES),@for pkg in $(PROVIDES); do cp $(PKG_INFO_DIR)/$(1).provides $(PKG_INFO_DIR)/$$$$pkg.provides; done)
+	$(CheckDependencies)
+
 	$(RSTRIP) $$(IDIR_$(1))
 	( \
 		echo "Package: $(1)"; \
@@ -136,7 +191,7 @@ ifeq ($(DUMP),)
     $$(INFO_$(1)): $$(IPKG_$(1))
 	@[ -d $(TARGET_DIR)/tmp ] || mkdir -p $(TARGET_DIR)/tmp
 	$(OPKG) install $$(IPKG_$(1))
-	$(if $(filter-out essential,$(PKG_FLAGS)),for flag in $(filter-out essential,$(PKG_FLAGS)); do $(OPKG) flag $$$$flag $(1); done)
+	$(if $(filter-out essential,$(PKG_FLAGS)),for flag in $(filter-out essential,$(PKG_FLAGS)); do $(OPKG) flag $$$$flag $(1); done,$(OPKG) flag ok $(1))
 
     $(1)-clean:
 	rm -f $(PACKAGE_DIR)/$(1)_*

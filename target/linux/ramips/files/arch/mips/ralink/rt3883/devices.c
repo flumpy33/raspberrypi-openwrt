@@ -14,6 +14,7 @@
 #include <linux/mtd/physmap.h>
 #include <linux/mtd/partitions.h>
 #include <linux/dma-mapping.h>
+#include <linux/spi/spi.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/clk.h>
@@ -310,10 +311,7 @@ static struct resource rt3883_wlan_resources[] = {
 	},
 };
 
-static struct rt2x00_platform_data rt3883_wlan_data = {
-	.eeprom_file_name	= "rt3883.eeprom",
-};
-
+struct rt2x00_platform_data rt3883_wlan_data;
 static struct platform_device rt3883_wlan_device = {
 	.name		= "rt2800_wmac",
 	.resource	= rt3883_wlan_resources,
@@ -325,6 +323,7 @@ static struct platform_device rt3883_wlan_device = {
 
 void __init rt3883_register_wlan(void)
 {
+	rt3883_wlan_data.eeprom_file_name = "RT3883.eeprom",
 	platform_device_register(&rt3883_wlan_device);
 }
 
@@ -365,8 +364,7 @@ static struct resource rt3883_nand_resources[] = {
 	},
 };
 
-static struct ramips_nand_platform_data rt3883_nand_data;
-
+struct ramips_nand_platform_data rt3883_nand_data;
 static struct platform_device rt3883_nand_device = {
 	.name		= RAMIPS_NAND_DRIVER_NAME,
 	.id		= -1,
@@ -377,9 +375,29 @@ static struct platform_device rt3883_nand_device = {
 	},
 };
 
-void __init rt3883_register_nand(struct mtd_partition *parts, int nr_parts)
+void __init rt3883_register_nand(void)
 {
-	rt3883_nand_data.parts = parts;
-	rt3883_nand_data.nr_parts = nr_parts;
 	platform_device_register(&rt3883_nand_device);
 }
+
+static struct resource rt3883_spi_resources[] = {
+	{
+		.flags	= IORESOURCE_MEM,
+		.start	= RT3883_SPI_BASE,
+		.end	= RT3883_SPI_BASE + RT3883_SPI_SIZE - 1,
+	},
+};
+
+static struct platform_device rt3883_spi_device = {
+	.name		= "ramips-spi",
+	.id		= 0,
+	.resource	= rt3883_spi_resources,
+	.num_resources	= ARRAY_SIZE(rt3883_spi_resources),
+};
+
+void __init rt3883_register_spi(struct spi_board_info *info, int n)
+{
+	spi_register_board_info(info, n);
+	platform_device_register(&rt3883_spi_device);
+}
+

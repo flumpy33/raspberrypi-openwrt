@@ -9,12 +9,12 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=fuse
-PKG_VERSION:=2.8.5
+PKG_VERSION:=2.9.0
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=@SF/$(PKG_NAME)
-PKG_MD5SUM:=8aa2fd689de00b73963620483084ae3b
+PKG_MD5SUM:=894ee11674f89a915ae87524aed55bc4
 
 PKG_INSTALL:=1
 
@@ -45,27 +45,12 @@ $(call Package/fuse/Default/description)
  - ulockmgr_server
 endef
 
-define KernelPackage/fuse
-  $(call Package/fuse/Default)
-  SUBMENU:=Filesystems
-  TITLE+= (kernel module)
-  KCONFIG:= CONFIG_FUSE_FS
-  FILES:=$(LINUX_DIR)/fs/fuse/fuse.ko
-  VERSION:=$(LINUX_VERSION)-$(LINUX_RELEASE)
-  AUTOLOAD:=$(call AutoLoad,80,fuse)
-endef
-
-define KernelPackage/fuse/description
-$(call Package/fuse/Default/description)
- This package contains the FUSE kernel module.
-endef
-
 define Package/libfuse
 $(call Package/fuse/Default)
   SECTION:=libs
   CATEGORY:=Libraries
   TITLE+= (library)
-  DEPENDS:=+kmod-fuse
+  DEPENDS:=+kmod-fuse +libpthread
   SUBMENU:=Filesystem
 endef
 
@@ -121,4 +106,3 @@ endef
 
 $(eval $(call BuildPackage,fuse-utils))
 $(eval $(call BuildPackage,libfuse))
-$(eval $(call KernelPackage,fuse))

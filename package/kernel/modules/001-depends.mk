@@ -30,3 +30,8 @@ endef
 define AddDepends/rfkill
   DEPENDS+= +(TARGET_ar71xx||TARGET_brcm47xx||TARGET_s3c24xx||TARGET_x86):kmod-rfkill $(1)
 endef
+
+
+define AddDepends/rtc
+  DEPENDS+= @RTC_SUPPORT
+endef

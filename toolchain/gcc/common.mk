@@ -49,6 +49,12 @@ ifeq ($(findstring linaro, $(CONFIG_GCC_VERSION)),linaro)
       PKG_VERSION_MAJOR:=4.6
       PKG_MD5SUM:=2b7887846f8e5ac1ca58fe4dfaabf5a6
     endif
+    ifeq ($(CONFIG_GCC_VERSION),"4.7-linaro")
+      PKG_REV:=4.7-2012.04
+      PKG_VERSION:=4.7.1
+      PKG_VERSION_MAJOR:=4.7
+      PKG_MD5SUM:=6dab459c1177fc9ae2969e7a39549d44
+    endif
     PKG_SOURCE_URL:=http://launchpad.net/gcc-linaro/$(PKG_VERSION_MAJOR)/$(PKG_REV)/+download/
     PKG_SOURCE:=$(PKG_NAME)-linaro-$(PKG_REV).tar.bz2
     GCC_DIR:=gcc-linaro-$(PKG_REV)
@@ -57,11 +63,14 @@ else
   PKG_SOURCE_URL:=@GNU/gcc/gcc-$(PKG_VERSION)
   PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
 
-  ifeq ($(PKG_VERSION),4.4.6)
-    PKG_MD5SUM:=ab525d429ee4425050a554bc9247d6c4
+  ifeq ($(PKG_VERSION),4.4.7)
+    PKG_MD5SUM:=295709feb4441b04e87dea3f1bab4281
   endif
   ifeq ($(PKG_VERSION),4.6.2)
     PKG_MD5SUM:=028115c4fbfb6cfd75d6369f4a90d87e
+  endif
+  ifeq ($(PKG_VERSION),4.7.0)
+    PKG_MD5SUM:=2a0f1d99fda235c29d40b561f81d9a77
   endif
 endif
 endif
@@ -153,10 +162,6 @@ ifeq ($(LIBC),uClibc)
 else
   GCC_CONFIGURE+= \
 		--enable-__cxa_atexit
-endif
-
-ifdef CONFIG_powerpc
-  TARGET_CFLAGS := $(patsubst -Os,-O2,$(TARGET_CFLAGS))
 endif
 
 ifneq ($(GCC_ARCH),)

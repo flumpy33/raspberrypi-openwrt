@@ -52,6 +52,22 @@ endef
 $(eval $(call KernelPackage,lib-crc7))
 
 
+define KernelPackage/lib-crc8
+  SUBMENU:=$(LIB_MENU)
+  TITLE:=CRC8 support
+  DEPENDS:= @!LINUX_2_6_39
+  KCONFIG:=CONFIG_CRC8
+  FILES:=$(LINUX_DIR)/lib/crc8.ko
+  AUTOLOAD:=$(call AutoLoad,20,crc8)
+endef
+
+define KernelPackage/lib-crc8/description
+ Kernel module for CRC8 support
+endef
+
+$(eval $(call KernelPackage,lib-crc8))
+
+
 define KernelPackage/lib-crc16
   SUBMENU:=$(LIB_MENU)
   TITLE:=CRC16 support
@@ -123,9 +139,29 @@ $(eval $(call KernelPackage,lib-textsearch))
 define KernelPackage/lib-zlib
   SUBMENU:=$(LIB_MENU)
   TITLE:=Zlib support
-  KCONFIG:=CONFIG_ZLIB_DEFLATE
-  FILES:=$(LINUX_DIR)/lib/zlib_deflate/zlib_deflate.ko
-  AUTOLOAD:=$(call AutoLoad,08,zlib_deflate,1)
+  KCONFIG:= \
+    CONFIG_ZLIB_DEFLATE \
+    CONFIG_ZLIB_INFLATE
+  FILES:= \
+    $(LINUX_DIR)/lib/zlib_deflate/zlib_deflate.ko \
+    $(LINUX_DIR)/lib/zlib_inflate/zlib_inflate.ko
+  AUTOLOAD:=$(call AutoLoad,08,zlib_deflate zlib_inflate,1)
 endef
 
 $(eval $(call KernelPackage,lib-zlib))
+
+
+define KernelPackage/lib-cordic
+  SUBMENU:=$(LIB_MENU)
+  TITLE:=Cordic function support
+  DEPENDS:= @!LINUX_2_6_39
+  KCONFIG:=CONFIG_CORDIC
+  FILES:=$(LINUX_DIR)/lib/cordic.ko
+  AUTOLOAD:=$(call AutoLoad,20,cordic)
+endef
+
+define KernelPackage/lib-cordic/description
+ Kernel module for Cordic function support
+endef
+
+$(eval $(call KernelPackage,lib-cordic))

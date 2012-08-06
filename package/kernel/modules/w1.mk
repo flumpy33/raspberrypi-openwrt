@@ -112,9 +112,22 @@ endef
 
 $(eval $(call KernelPackage,w1-slave-smem))
 
+define KernelPackage/w1-slave-ds2431
+  TITLE:=DS2431 1kb EEPROM driver
+  KCONFIG:= CONFIG_W1_SLAVE_DS2431
+  FILES:=$(W1_SLAVES_DIR)/w1_ds2431.ko
+  AUTOLOAD:=$(call AutoLoad,70,w1_ds2431)
+  $(call AddDepends/w1)
+endef
+
+define KernelPackage/w1-slave-ds2431/description
+  Kernel module for 1-wire 1kb EEPROM (DS2431)
+endef
+
+$(eval $(call KernelPackage,w1-slave-ds2431))
 
 define KernelPackage/w1-slave-ds2433
-  TITLE:=Simple 64bit memory family implementation
+  TITLE:=DS2433 4kb EEPROM driver
   KCONFIG:= \
 	CONFIG_W1_SLAVE_DS2433 \
 	CONFIG_W1_SLAVE_DS2433_CRC=n
@@ -124,7 +137,7 @@ define KernelPackage/w1-slave-ds2433
 endef
 
 define KernelPackage/w1-slave-ds2433/description
-  Kernel module for 1-wire simple 64bit memory rom(ds2401/ds2411/ds1990*)
+  Kernel module for 1-wire 4kb EEPROM (DS2433)
 endef
 
 $(eval $(call KernelPackage,w1-slave-ds2433))

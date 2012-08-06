@@ -25,7 +25,7 @@ $(eval $(call KernelPackage,fs-autofs4))
 define KernelPackage/fs-btrfs
   SUBMENU:=$(FS_MENU)
   TITLE:=BTRFS filesystem support
-  DEPENDS:=+kmod-lib-crc32c +!(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36||LINUX_2_6_37):kmod-lib-lzo +kmod-lib-zlib
+  DEPENDS:=+kmod-lib-crc32c +kmod-lib-lzo +kmod-lib-zlib
   KCONFIG:=\
 	CONFIG_BTRFS_FS \
 	CONFIG_BTRFS_FS_POSIX_ACL=n \
@@ -45,17 +45,20 @@ $(eval $(call KernelPackage,fs-btrfs))
 define KernelPackage/fs-cifs
   SUBMENU:=$(FS_MENU)
   TITLE:=CIFS support
-  KCONFIG:=CONFIG_CIFS
+  KCONFIG:= \
+	CONFIG_CIFS \
+	CONFIG_CIFS_DFS_UPCALL=n \
+	CONFIG_CIFS_UPCALL=n
   FILES:=$(LINUX_DIR)/fs/cifs/cifs.ko
   AUTOLOAD:=$(call AutoLoad,30,cifs)
   $(call AddDepends/nls)
   DEPENDS+= \
-    +!(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36):kmod-crypto-arc4 \
-    +!(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36):kmod-crypto-hmac \
-    +!(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36):kmod-crypto-md5 \
-    +!(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36||LINUX_2_6_37):kmod-crypto-md4 \
-    +!(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36||LINUX_2_6_37||LINUX_2_6_38||LINUX_2_6_39):kmod-crypto-des \
-    +!(LINUX_2_6_30||LINUX_2_6_31||LINUX_2_6_32||LINUX_2_6_36||LINUX_2_6_37||LINUX_2_6_38||LINUX_2_6_39):kmod-crypto-ecb
+    +kmod-crypto-arc4 \
+    +kmod-crypto-hmac \
+    +kmod-crypto-md5 \
+    +kmod-crypto-md4 \
+    +kmod-crypto-des \
+    +kmod-crypto-ecb
 endef
 
 define KernelPackage/fs-cifs/description
@@ -80,42 +83,6 @@ endef
 $(eval $(call KernelPackage,fs-exportfs))
 
 
-define KernelPackage/fs-ext2
-  SUBMENU:=$(FS_MENU)
-  TITLE:=EXT2 filesystem support
-  KCONFIG:=CONFIG_EXT2_FS
-  DEPENDS:=@LINUX_2_6_30||LINUX_2_6_31
-  FILES:=$(LINUX_DIR)/fs/ext2/ext2.ko
-  AUTOLOAD:=$(call AutoLoad,32,ext2,1)
-endef
-
-define KernelPackage/fs-ext2/description
- Kernel module for EXT2 filesystem support
-endef
-
-$(eval $(call KernelPackage,fs-ext2,1))
-
-
-define KernelPackage/fs-ext3
-  SUBMENU:=$(FS_MENU)
-  TITLE:=EXT3 filesystem support
-  KCONFIG:= \
-	CONFIG_EXT3_FS \
-	CONFIG_JBD
-  DEPENDS:=@LINUX_2_6_30||LINUX_2_6_31
-  FILES:= \
-	$(LINUX_DIR)/fs/ext3/ext3.ko \
-	$(LINUX_DIR)/fs/jbd/jbd.ko
-  AUTOLOAD:=$(call AutoLoad,31,jbd ext3,1)
-endef
-
-define KernelPackage/fs-ext3/description
- Kernel module for EXT3 filesystem support
-endef
-
-$(eval $(call KernelPackage,fs-ext3))
-
-
 define KernelPackage/fs-ext4
   SUBMENU:=$(FS_MENU)
   TITLE:=EXT4 filesystem support
@@ -124,14 +91,9 @@ define KernelPackage/fs-ext4
 	CONFIG_JBD2
   FILES:= \
 	$(LINUX_DIR)/fs/ext4/ext4.ko \
-	$(LINUX_DIR)/fs/jbd2/jbd2.ko
- ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),ge,2.6.37)),1)
-    FILES+= \
+	$(LINUX_DIR)/fs/jbd2/jbd2.ko \
 	$(LINUX_DIR)/fs/mbcache.ko
-    AUTOLOAD:=$(call AutoLoad,30,mbcache jbd2 ext4,1)
- else
-    AUTOLOAD:=$(call AutoLoad,30,jbd2 ext4,1)
- endif
+  AUTOLOAD:=$(call AutoLoad,30,mbcache jbd2 ext4,1)
   $(call AddDepends/crc16)
 endef
 
@@ -140,6 +102,21 @@ define KernelPackage/fs-ext4/description
 endef
 
 $(eval $(call KernelPackage,fs-ext4))
+
+
+define KernelPackage/fuse
+  SUBMENU:=$(FS_MENU)
+  TITLE:=FUSE (Filesystem in Userspace) support
+  KCONFIG:= CONFIG_FUSE_FS
+  FILES:=$(LINUX_DIR)/fs/fuse/fuse.ko
+  AUTOLOAD:=$(call AutoLoad,80,fuse)
+endef
+
+define KernelPackage/fuse/description
+ Kernel module for userspace filesystem support
+endef
+
+$(eval $(call KernelPackage,fuse))
 
 
 define KernelPackage/fs-hfs
@@ -226,7 +203,9 @@ define KernelPackage/fs-nfs
   TITLE:=NFS filesystem support
   DEPENDS:=+kmod-fs-nfs-common
   KCONFIG:= \
-	CONFIG_NFS_FS
+	CONFIG_NFS_FS \
+	CONFIG_NFS_USE_LEGACY_DNS=n \
+	CONFIG_NFS_USE_NEW_IDMAPPER=n
   FILES:= \
 	$(LINUX_DIR)/fs/nfs/nfs.ko
   AUTOLOAD:=$(call AutoLoad,40,nfs)
@@ -277,7 +256,9 @@ define KernelPackage/fs-nfsd
   SUBMENU:=$(FS_MENU)
   TITLE:=NFS kernel server support
   DEPENDS:=+kmod-fs-nfs-common +kmod-fs-exportfs
-  KCONFIG:=CONFIG_NFSD
+  KCONFIG:= \
+	CONFIG_NFSD \
+	CONFIG_NFSD_FAULT_INJECTION=n
   FILES:=$(LINUX_DIR)/fs/nfsd/nfsd.ko
   AUTOLOAD:=$(call AutoLoad,40,nfsd)
 endef
@@ -361,7 +342,7 @@ define KernelPackage/fs-xfs
   SUBMENU:=$(FS_MENU)
   TITLE:=XFS filesystem support
   KCONFIG:=CONFIG_XFS_FS
-  DEPENDS:= +kmod-fs-exportfs
+  DEPENDS:= +kmod-fs-exportfs @!avr32
   FILES:=$(LINUX_DIR)/fs/xfs/xfs.ko
   AUTOLOAD:=$(call AutoLoad,30,xfs,1)
 endef

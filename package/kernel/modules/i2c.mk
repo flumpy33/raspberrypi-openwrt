@@ -101,41 +101,6 @@ endef
 
 $(eval $(call KernelPackage,i2c-gpio))
 
-I2C_SCX200_MODULES:=\
-  CONFIG_SCx200_I2C:drivers/i2c/busses/scx200_i2c
-
-define KernelPackage/i2c-scx200
-  $(call i2c_defaults,$(I2C_SCX200_MODULES),59)
-  TITLE:=Geode SCx200 I2C using GPIO pins
-  DEPENDS:=@PCI_SUPPORT @TARGET_x86 +kmod-i2c-algo-bit
-  KCONFIG+= \
-	CONFIG_SCx200_I2C_SCL=12 \
-	CONFIG_SCx200_I2C_SDA=13
-endef
-
-define KernelPackage/i2c-scx200/description
- Kernel module for I2C using GPIO pins on the Geode SCx200 processors.
-endef
-
-$(eval $(call KernelPackage,i2c-scx200))
-
-
-I2C_SCX200_ACB_MODULES:=\
-  CONFIG_SCx200_ACB:drivers/i2c/busses/scx200_acb
-
-define KernelPackage/i2c-scx200-acb
-  $(call i2c_defaults,$(I2C_SCX200_ACB_MODULES),59)
-  TITLE:=Geode SCx200 ACCESS.bus support
-  DEPENDS:=@PCI_SUPPORT @TARGET_x86 +kmod-i2c-algo-bit
-endef
-
-define KernelPackage/i2c-scx200-acb/description
- Kernel module for I2C using the ACCESS.bus controllers on the Geode SCx200
- and SC1100 processors and the CS5535 and CS5536 Geode companion devices.
-endef
-
-$(eval $(call KernelPackage,i2c-scx200-acb))
-
 
 OF_I2C_MODULES:=\
   CONFIG_OF_I2C:drivers/of/of_i2c
@@ -143,7 +108,8 @@ OF_I2C_MODULES:=\
 define KernelPackage/of-i2c
   $(call i2c_defaults,$(OF_I2C_MODULES),58)
   TITLE:=OpenFirmware I2C accessors
-  DEPENDS:=@TARGET_ppc40x||TARGET_ppc4xx kmod-i2c-core
+  DEPENDS:=@TARGET_ppc40x||TARGET_ppc4xx||TARGET_mpc52xx||TARGET_mpc83xx||TARGET_mpc85xx \
+          kmod-i2c-core
 endef
 
 define KernelPackage/of-i2c/description
@@ -152,6 +118,21 @@ endef
 
 $(eval $(call KernelPackage,of-i2c))
 
+I2C_MPC_MODULES:=\
+  CONFIG_I2C_MPC:drivers/i2c/busses/i2c-mpc
+
+define KernelPackage/i2c-mpc
+  $(call i2c_defaults,$(I2C_MPC_MODULES),59)
+  TITLE:=MPC I2C accessors
+  DEPENDS:=@TARGET_mpc52xx||TARGET_mpc83xx||TARGET_mpc85xx \
+          +kmod-i2c-core +kmod-of-i2c
+endef
+
+define KernelPackage/i2c-mpc/description
+ Kernel module for Freescale MPC52xx MPC83xx MPC85xx I2C accessors.
+endef
+
+$(eval $(call KernelPackage,i2c-mpc))
 
 I2C_IBM_IIC_MODULES:=\
   CONFIG_I2C_IBM_IIC:drivers/i2c/busses/i2c-ibm_iic
@@ -183,37 +164,6 @@ define KernelPackage/i2c-mv64xxx/description
 endef
 
 $(eval $(call KernelPackage,i2c-mv64xxx))
-
-
-I2C_AT91_MODULES:=\
-  CONFIG_I2C_AT91:drivers/i2c/busses/i2c-at91
-
-define KernelPackage/at91-i2c
-  $(call i2c_defaults,$(I2C_AT91_MODULES),55)
-  TITLE:=I2C (TWI) master driver for Atmel AT91
-  DEPENDS:=@TARGET_at91 +kmod-i2c-core
-endef
-
-define KernelPackage/at91-i2c/description
- Kernel module to use the I2C (TWI) master driver for Atmel AT91
-endef
-
-$(eval $(call KernelPackage,at91-i2c))
-
-I2C_OCTEON_MODULES:=\
-  CONFIG_I2C_OCTEON:drivers/i2c/busses/i2c-octeon
-
-define KernelPackage/octeon-i2c
-  $(call i2c_defaults,$(I2C_OCTEON_MODULES),59)
-  TITLE:=I2C master driver for Cavium Octeon
-  DEPENDS:=@TARGET_octeon +kmod-i2c-core
-endef
-
-define KernelPackage/octeon-i2c/description
-  Kernel module to use the I2C master driver on Cavium Octeon
-endef
-
-$(eval $(call KernelPackage,octeon-i2c))
 
 
 I2C_TINY_USB_MODULES:= \
@@ -293,13 +243,8 @@ endef
 
 $(eval $(call KernelPackage,i2c-mux-pca9541))
 
-ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),ge,3.1.0)),1)
 GPIO_PCA953X_MODULES:= \
   CONFIG_GPIO_PCA953X:drivers/gpio/gpio-pca953x
-else
-GPIO_PCA953X_MODULES:= \
-  CONFIG_GPIO_PCA953X:drivers/gpio/pca953x
-endif
 
 define KernelPackage/pca953x
   $(call i2c_defaults,$(GPIO_PCA953X_MODULES),51)
@@ -313,13 +258,8 @@ endef
 
 $(eval $(call KernelPackage,pca953x))
 
-ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),ge,3.1.0)),1)
 GPIO_PCF857X_MODULES:= \
   CONFIG_GPIO_PCF857X:drivers/gpio/gpio-pcf857x
-else
-GPIO_PCF857X_MODULES:= \
-  CONFIG_GPIO_PCF857X:drivers/gpio/pcf857x
-endif
 
 define KernelPackage/pcf857x
   $(call i2c_defaults,$(GPIO_PCF857X_MODULES),51)

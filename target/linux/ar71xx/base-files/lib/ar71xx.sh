@@ -41,6 +41,8 @@ wndr3700_board_detect() {
 		model=$(ar71xx_get_mtd_offset_size_format art 56 10 %c)
 		if [ -z "$model" ] || [ "$model" = $'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff' ]; then
 			machine="NETGEAR WNDR3700v2"
+		elif [ -z "$model" ] || [ "$model" = $'\xff\xff\xff\xff\xff\xff\xff\xff\xffN' ]; then
+			machine="NETGEAR WNDRMAC"
 		else
 			machine="NETGEAR $model"
 		fi
@@ -97,6 +99,9 @@ tplink_board_detect() {
 	"094100"*)
 		model="TP-Link TL-WR941N/ND"
 		;;
+	"104100"*)
+		model="TP-Link TL-WR1041N/ND"
+		;;
 	"104300"*)
 		model="TP-Link TL-WR1043N/ND"
 		;;
@@ -109,11 +114,20 @@ tplink_board_detect() {
 	"302000"*)
 		model="TP-Link TL-MR3020"
 		;;
+	"304000"*)
+		model="TP-Link TL-MR3040"
+		;;
 	"322000"*)
 		model="TP-Link TL-MR3220"
 		;;
 	"342000"*)
 		model="TP-Link TL-MR3420"
+		;;
+	"430000"*)
+		model="TP-Link TL-WDR4300"
+		;;
+	"431000"*)
+		model="TP-Link TL-WDR4310"
 		;;
 	*)
 		hwver=""
@@ -151,6 +165,9 @@ ar71xx_board_detect() {
 	*AP121-MINI)
 		name="ap121-mini"
 		;;
+	*"AP136 reference board")
+		name="ap136"
+		;;
 	*AP81)
 		name="ap81"
 		;;
@@ -181,6 +198,9 @@ ar71xx_board_detect() {
 	*JA76PF)
 		name="ja76pf"
 		;;
+	*JA76PF2)
+		name="ja76pf2"
+		;;
 	*"Bullet M")
 		name="bullet-m"
 		;;
@@ -208,10 +228,13 @@ ar71xx_board_detect() {
 	*OM2P)
 		name="om2p"
 		;;
+	*"OM2P LC")
+		name="om2p-lc"
+		;;
 	*PB42)
 		name="pb42"
 		;;
-	*PB44)
+	*"PB44 reference board")
 		name="pb44"
 		;;
 	*PB92)
@@ -244,6 +267,15 @@ ar71xx_board_detect() {
 	*"RouterBOARD 750")
 		name="rb-750"
 		;;
+	*"RouterBOARD 750GL")
+		name="rb-750gl"
+		;;
+	*"RouterBOARD 751")
+		name="rb-751"
+		;;
+	*"RouterBOARD 751G")
+		name="rb-751g"
+		;;
 	*"Rocket M")
 		name="rocket-m"
 		;;
@@ -261,6 +293,9 @@ ar71xx_board_detect() {
 		;;
 	*TEW-673GRU)
 		name="tew-673gru"
+		;;
+	*"TL-WR1041N v2")
+		name="tl-wr1041n-v2"
 		;;
 	*TL-WR1043ND)
 		name="tl-wr1043nd"
@@ -285,6 +320,9 @@ ar71xx_board_detect() {
 		;;
 	*"TL-WA901ND v2")
 		name="tl-wa901nd-v2"
+		;;
+	*TL-WDR4300)
+		name="tl-wdr4300"
 		;;
 	*TL-WR741ND)
 		name="tl-wr741nd"
@@ -315,6 +353,9 @@ ar71xx_board_detect() {
 		;;
 	*WHR-HP-GN)
 		name="whr-hp-gn"
+		;;
+	*WLAE-AG300N)
+		name="wlae-ag300n"
 		;;
 	*WP543)
 		name="wp543"
@@ -354,6 +395,12 @@ ar71xx_board_detect() {
 		;;
 	*ZCN-1523H-5)
 		name="zcn-1523h-5"
+		;;
+	*EmbWir-Dorin)
+		name="ew-dorin"
+		;;
+	*EmbWir-Dorin-Router)
+		name="ew-dorin-router"
 		;;
 	esac
 

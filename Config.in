@@ -46,8 +46,14 @@ menu "Target Images"
 
 			config TARGET_INITRAMFS_COMPRESSION_XZ
 				bool "xz"
-				depends LINUX_2_6_38
 		endchoice
+
+		config EXTERNAL_CPIO
+			string
+			prompt "Use external cpio" if TARGET_ROOTFS_INITRAMFS
+			default ""
+			help
+			  Kernel uses specified external cpio as INITRAMFS_SOURCE
 
 	comment "Root filesystem archives"
 
@@ -193,6 +199,15 @@ menu "Global build settings"
 		help
 		  This will give you more information in stack traces from kernel oopses
 
+	config KERNEL_FTRACE
+		bool "Compile the kernel with tracing support"
+		default n
+
+	config KERNEL_ENABLE_DEFAULT_TRACERS
+		bool "Trace process context switches and events"
+		depends on KERNEL_FTRACE
+		default n
+
 	config KERNEL_DEBUG_KERNEL
 		bool
 		default n
@@ -204,10 +219,16 @@ menu "Global build settings"
 		help
 		  This will compile your kernel and modules with debug information.
 
+	config KERNEL_DEBUG_LL_UART_NONE
+		bool
+		default n
+		depends on arm
+
 	config KERNEL_DEBUG_LL
 		bool
 		default n
 		depends on arm
+		select KERNEL_DEBUG_LL_UART_NONE
 		help
 		  ARM low level debugging
 
@@ -296,6 +317,7 @@ menu "Global build settings"
 		bool
 		prompt "Parallelize the default package build rule (May break build)"
 		depends on PKG_BUILD_PARALLEL
+		depends on BROKEN
 		default n
 		help
 		  Always set the default package build rules to parallel build.
@@ -311,6 +333,7 @@ menu "Global build settings"
 		bool
 		prompt "Parallelize the toolchain build (May break build)"
 		depends on PKG_BUILD_PARALLEL
+		depends on BROKEN
 		default n
 		help
 		  Build the toolchain with parallel make jobs.
@@ -373,6 +396,21 @@ menu "Global build settings"
 		  selected packages (including those selected as <M>)
 		  Note that this will make the system libraries incompatible with most of the packages
 		  that are not selected during the build process
+
+	choice
+		prompt "Preferred standard C++ library"
+		default USE_LIBSTDCXX if USE_EGLIBC
+		default USE_UCLIBCXX
+		help
+		  Select the preferred standard C++ library for all packages that support this.
+
+		config USE_UCLIBCXX
+			bool "uClibc++"
+
+		config USE_LIBSTDCXX
+			bool "libstdc++"
+
+	endchoice
 
 endmenu
 

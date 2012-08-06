@@ -2,6 +2,11 @@ if RALINK_RT305X
 
 menu "Ralink RT350x machine selection"
 
+config RT305X_MACH_3G_6200N
+	bool "Edimax 3G-6200N board support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
 config RT305X_MACH_WR6202
 	bool "Accton WR6202"
 	select RALINK_DEV_GPIO_BUTTONS
@@ -9,6 +14,11 @@ config RT305X_MACH_WR6202
 
 config RT305X_MACH_ALL0256N
 	bool "Allnet ALL0256N support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+	
+config RT305X_MACH_ALL5002
+	bool "Allnet ALL5002 support"
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
@@ -25,6 +35,21 @@ config RT305X_MACH_ARGUS_ATP52B
 config RT305X_MACH_RT_G32_REVB
 	bool "Asus RT-G32 revB board support"
 	select RALINK_DEV_GPIO_BUTTONS
+
+config RT305X_MACH_RT_N10_PLUS
+	bool "Asus RT-N10+ board support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
+config RT305X_MACH_WL_330N
+	bool "Asus WL-330N board support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
+config RT305X_MACH_WL_330N3G
+	bool "Asus WL-330N3G board support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
 
 config RT305X_MACH_HW550_3G
 	bool "Aztech HW550-3G support"
@@ -46,6 +71,11 @@ config RT305X_MACH_DIR_300_REVB
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
+config RT305X_MACH_DAP_1350
+	bool "D-Link DAP-1350 board support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
 config RT305X_MACH_ESR_9753
 	bool "EnGenius ESR-9753 support"
 	select RALINK_DEV_GPIO_BUTTONS
@@ -56,6 +86,9 @@ config RT305X_MACH_FONERA20N
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
+config RT305X_MACH_FREESTATION5
+	bool "ARC FreeStation5"
+
 config RT305X_MACH_MOFI3500_3GN
 	bool "MoFi Network MOFI3500-3GN support"
 	select RALINK_DEV_GPIO_BUTTONS
@@ -63,6 +96,11 @@ config RT305X_MACH_MOFI3500_3GN
 
 config RT305X_MACH_WR512_3GN
 	bool "SH-WR512NU/WS-WR512N1-like 3GN router"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
+config RT305X_MACH_UR_336UN
+	bool "UR-336UN Wireless N router"
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
@@ -81,6 +119,11 @@ config RT305X_MACH_OMNI_EMB
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
+config RT305X_MACH_PSR_680W
+	bool "Petatel PSR-680W Wireless 3G Router support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
 config RT305X_MACH_PWH2004
 	bool "Prolink PWH2004 / Abocom WR5205 support (32M RAM, 8M flash)"
 	select RALINK_DEV_GPIO_BUTTONS
@@ -88,6 +131,11 @@ config RT305X_MACH_PWH2004
 
 config RT305X_MACH_V22RW_2X2
 	bool "Ralink AP-RT3052-V22RW-2X2 board support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
+config RT305X_MACH_W306R_V20
+	bool "Tenda W306R V2.0 board support"
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
@@ -101,6 +149,11 @@ config RT305X_MACH_WL351
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
+config RT305X_MACH_SL_R7205
+	bool "Skyline SL-R7205 Wireless 3G Router support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
 config RT305X_MACH_WCR150GN
 	bool "Sparklan WCR-150GN support"
 	select RALINK_DEV_GPIO_BUTTONS
@@ -108,6 +161,11 @@ config RT305X_MACH_WCR150GN
 
 config RT305X_MACH_NBG_419N
 	bool "ZyXEL NBG-419N support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
+config RT305X_MACH_XDX_RN502J
+	bool "Unknown board XDX-RN502J"
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
