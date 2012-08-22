@@ -11,7 +11,7 @@ include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=base-files
-PKG_RELEASE:=112
+PKG_RELEASE:=115
 
 PKG_FILE_DEPENDS:=$(PLATFORM_DIR)/ $(GENERIC_PLATFORM_DIR)/base-files/
 PKG_BUILD_DEPENDS:=opkg/host
@@ -22,9 +22,6 @@ ifneq ($(DUMP),1)
   TARGET:=-$(BOARD)
   ifneq ($(wildcard $(PLATFORM_DIR)/base-files-$(PROFILE) $(PLATFORM_SUBDIR)/base-files-$(PROFILE)),)
     TARGET:=$(TARGET)-$(PROFILE)
-  endif
-  ifneq ($(findstring $(ARCH) , mips64 x86_64 ),)
-    LIB_SUFFIX:=64
   endif
 endif
 

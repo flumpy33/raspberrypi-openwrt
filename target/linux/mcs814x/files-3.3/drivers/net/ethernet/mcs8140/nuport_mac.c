@@ -256,6 +256,8 @@ static int nuport_mac_start_tx_dma(struct nuport_mac_priv *priv,
 
 	priv->tx_addr = dma_map_single(&priv->pdev->dev, skb->data,
 			skb->len, DMA_TO_DEVICE);
+	if (dma_mapping_error(&priv->pdev->dev, priv->tx_addr))
+		return -ENOMEM;
 
 	/* enable enhanced mode */
 	nuport_mac_writel(TX_DMA_ENH_ENABLE, TX_DMA_ENH);
@@ -297,6 +299,8 @@ static int nuport_mac_start_rx_dma(struct nuport_mac_priv *priv,
 
 	priv->rx_addr = dma_map_single(&priv->pdev->dev, skb->data,
 				RX_ALLOC_SIZE, DMA_FROM_DEVICE);
+	if (dma_mapping_error(&priv->pdev->dev, priv->rx_addr))
+		return -ENOMEM;
 
 	nuport_mac_writel(priv->rx_addr, RX_BUFFER_ADDR);
 	wmb();
@@ -684,6 +688,10 @@ static void nuport_mac_free_rx_ring(struct nuport_mac_priv *priv)
 		dev_kfree_skb(priv->rx_skb[i]);
 		priv->rx_skb[i] = NULL;
 	}
+
+	if (priv->rx_addr)
+		dma_unmap_single(&priv->pdev->dev, priv->rx_addr, RX_ALLOC_SIZE,
+				DMA_TO_DEVICE);
 }
 
 static void nuport_mac_read_mac_address(struct net_device *dev)
@@ -757,7 +765,12 @@ static int nuport_mac_open(struct net_device *dev)
 		goto out_emac_clk;
 	}
 
-	phy_start(priv->phydev);
+	ret = request_irq(priv->tx_irq, &nuport_mac_tx_interrupt,
+				0, dev->name, dev);
+	if (ret) {
+		netdev_err(dev, "unable to request rx interrupt\n");
+		goto out_link_irq;
+	}
 
 	/* Enable link interrupt monitoring for our PHY address */
 	reg = LINK_INT_EN | (priv->phydev->addr << LINK_PHY_ADDR_SHIFT);
@@ -771,14 +784,7 @@ static int nuport_mac_open(struct net_device *dev)
 	nuport_mac_writel(LINK_POLL_MASK, LINK_INT_POLL_TIME);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
-	ret = request_irq(priv->tx_irq, &nuport_mac_tx_interrupt,
-				0, dev->name, dev);
-	if (ret) {
-		netdev_err(dev, "unable to request rx interrupt\n");
-		goto out_link_irq;
-	}
-
-	napi_enable(&priv->napi);
+	phy_start(priv->phydev);
 
 	ret = request_irq(priv->rx_irq, &nuport_mac_rx_interrupt,
 				0, dev->name, dev);
@@ -801,7 +807,13 @@ static int nuport_mac_open(struct net_device *dev)
 	nuport_mac_reset_rx_dma(priv);
 
 	/* Start RX DMA */
-	return nuport_mac_start_rx_dma(priv, priv->rx_skb[0]);
+	spin_lock_irqsave(&priv->lock, flags);
+	ret = nuport_mac_start_rx_dma(priv, priv->rx_skb[0]);
+	spin_unlock_irqrestore(&priv->lock, flags);
+
+	napi_enable(&priv->napi);
+
+	return ret;
 
 out_rx_skb:
 	nuport_mac_free_rx_ring(priv);

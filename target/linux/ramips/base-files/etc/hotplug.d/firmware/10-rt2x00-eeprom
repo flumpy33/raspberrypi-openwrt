@@ -53,10 +53,13 @@ case "$FIRMWARE" in
 		;;
 
 	3g-6200n | \
+	all0239-3g | \
 	all0256n | \
 	all5002 | \
 	argus-atp52b | \
 	bc2 | \
+	dir-615-h1 | \
+	dir-620-a1 | \
 	esr-9753 | \
 	fonera20n | \
 	freestation5 | \

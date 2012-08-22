@@ -15,12 +15,15 @@ platform_check_image() {
 
 	case "$board" in
 	3g-6200n | \
+	all0239-3g | \
 	all0256n | \
 	all5002 | \
 	bc2 | \
 	dir-300-b1 | \
 	dir-600-b1 | \
 	dir-600-b2 | \
+	dir-615-h1 | \
+	dir-620-a1 | \
 	dap-1350 | \
 	esr-9753 | \
 	fonera20n | \

@@ -50,6 +50,9 @@ ramips_board_name() {
 	*"Edimax 3g-6200n")
 		name="3g-6200n"
 		;;
+	*"Allnet ALL0239-3G")
+		name="all0239-3g"
+		;;
 	*"Allnet ALL0256N")
 		name="all0256n"
 		;;
@@ -79,6 +82,12 @@ ramips_board_name() {
 		;;
 	*"DIR-600 B2")
 		name="dir-600-b2"
+		;;
+	*"DIR-620 A1")
+		name="dir-620-a1"
+		;;
+	*"DIR-615 H1")
+		name="dir-615-h1"
 		;;
         *"DAP-1350")
                 name="dap-1350"

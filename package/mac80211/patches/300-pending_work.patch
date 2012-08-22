@@ -3325,6 +3325,22 @@
  	}
  
  	if (ath_beacon_dtim_pending_cab(skb)) {
+@@ -1044,7 +1044,6 @@ int ath_rx_tasklet(struct ath_softc *sc,
+ 	struct ieee80211_hw *hw = sc->hw;
+ 	struct ieee80211_hdr *hdr;
+ 	int retval;
+-	bool decrypt_error = false;
+ 	struct ath_rx_status rs;
+ 	enum ath9k_rx_qtype qtype;
+ 	bool edma = !!(ah->caps.hw_caps & ATH9K_HW_CAP_EDMA);
+@@ -1066,6 +1065,7 @@ int ath_rx_tasklet(struct ath_softc *sc,
+ 	tsf_lower = tsf & 0xffffffff;
+ 
+ 	do {
++		bool decrypt_error = false;
+ 		/* If handling rx interrupt and flush is in progress => exit */
+ 		if (test_bit(SC_OP_RXFLUSH, &sc->sc_flags) && (flush == 0))
+ 			break;
 --- a/drivers/net/wireless/ath/ath9k/xmit.c
 +++ b/drivers/net/wireless/ath/ath9k/xmit.c
 @@ -29,6 +29,8 @@
@@ -4313,26 +4329,6 @@
  			ieee80211_get_tx_rate(ah->hw, info)->hw_value,
  			1, AR5K_TXKEYIX_INVALID,
  			antenna, flags, 0, 0);
---- a/drivers/net/wireless/ath/ath5k/eeprom.c
-+++ b/drivers/net/wireless/ath/ath5k/eeprom.c
-@@ -524,7 +524,7 @@ ath5k_eeprom_read_freq_list(struct ath5k
- 
- 		freq1 = val & 0xff;
- 		if (!freq1)
--			break;
-+			continue;
- 
- 		pc[i++].freq = ath5k_eeprom_bin2freq(ee,
- 				freq1, mode);
-@@ -532,7 +532,7 @@ ath5k_eeprom_read_freq_list(struct ath5k
- 
- 		freq2 = (val >> 8) & 0xff;
- 		if (!freq2)
--			break;
-+			continue;
- 
- 		pc[i++].freq = ath5k_eeprom_bin2freq(ee,
- 				freq2, mode);
 --- a/drivers/net/wireless/ath/ath5k/phy.c
 +++ b/drivers/net/wireless/ath/ath5k/phy.c
 @@ -3518,6 +3518,7 @@ ath5k_setup_rate_powertable(struct ath5k
@@ -4415,3 +4411,24 @@
  	if (ret)
  		return ret;
  
+--- a/drivers/net/wireless/ath/ath5k/eeprom.c
++++ b/drivers/net/wireless/ath/ath5k/eeprom.c
+@@ -1484,7 +1484,7 @@ ath5k_eeprom_read_target_rate_pwr_info(s
+ 	case AR5K_EEPROM_MODE_11A:
+ 		offset += AR5K_EEPROM_TARGET_PWR_OFF_11A(ee->ee_version);
+ 		rate_pcal_info = ee->ee_rate_tpwr_a;
+-		ee->ee_rate_target_pwr_num[mode] = AR5K_EEPROM_N_5GHZ_CHAN;
++		ee->ee_rate_target_pwr_num[mode] = AR5K_EEPROM_N_5GHZ_RATE_CHAN;
+ 		break;
+ 	case AR5K_EEPROM_MODE_11B:
+ 		offset += AR5K_EEPROM_TARGET_PWR_OFF_11B(ee->ee_version);
+--- a/drivers/net/wireless/ath/ath5k/eeprom.h
++++ b/drivers/net/wireless/ath/ath5k/eeprom.h
+@@ -182,6 +182,7 @@
+ #define AR5K_EEPROM_EEP_DELTA		10
+ #define AR5K_EEPROM_N_MODES		3
+ #define AR5K_EEPROM_N_5GHZ_CHAN		10
++#define AR5K_EEPROM_N_5GHZ_RATE_CHAN	8
+ #define AR5K_EEPROM_N_2GHZ_CHAN		3
+ #define AR5K_EEPROM_N_2GHZ_CHAN_2413	4
+ #define	AR5K_EEPROM_N_2GHZ_CHAN_MAX	4

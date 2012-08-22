@@ -13,6 +13,7 @@ preinit_set_mac_address() {
 		ifconfig eth0 hw ether $mac 2>/dev/null
 		;;
 	bc2 |\
+	dir-620-a1 |\
 	esr-9753 |\
 	freestation5 |\
 	nw718 |\
@@ -33,8 +34,10 @@ preinit_set_mac_address() {
 		mac=$(ramips_get_mac_binary devdata 46)
 		ifconfig eth0 hw ether $mac 2>/dev/null
                 ;;
+	all0239-3g |\
 	all0256n |\
-	all5002 | \
+	all5002 |\
+	dir-615-h1 |\
 	fonera20n |\
 	hw550-3g |\
 	nbg-419n |\
