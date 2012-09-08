@@ -1,0 +1,57 @@
+From 872a8ff772ded51403bd8a46f80b1bf9706b76cd Mon Sep 17 00:00:00 2001
+From: Paul Walmsley <paul@pwsan.com>
+Date: Mon, 12 Mar 2012 10:58:00 -0600
+Subject: [PATCH] mmc: use really long write timeout to deal with crappy cards
+
+mmc: use really long write timeout to deal with crappy cards
+
+Several people have noticed that crappy SD cards take much longer to
+complete multiple block writes than the 300ms that Linux specifies.
+Try to work around this by using a three second write timeout instead.
+
+This is a generalized version of a patch from Chase Maupin
+<Chase.Maupin@ti.com>, whose patch description said:
+
+* With certain SD cards timeouts like the following have been seen
+  due to an improper calculation of the dto value:
+    mmcblk0: error -110 transferring data, sector 4126233, nr 8,
+    card status 0xc00
+* By removing the dto calculation and setting the timeout value
+  to the maximum specified by the SD card specification part A2
+  section 2.2.15 these timeouts can be avoided.
+* This change has been used by beagleboard users as well as the
+  Texas Instruments SDK without a negative impact.
+* There are multiple discussion threads about this but the most
+  relevant ones are:
+    * http://talk.maemo.org/showthread.php?p=1000707#post1000707
+    * http://www.mail-archive.com/linux-omap@vger.kernel.org/msg42213.html
+* Original proposal for this fix was done by Sukumar Ghoral of
+  Texas Instruments
+* Tested using a Texas Instruments AM335x EVM
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Chris Ball <cjb@laptop.org>
+
+Index: linux-3.3.8/drivers/mmc/core/core.c
+===================================================================
+--- linux-3.3.8.orig/drivers/mmc/core/core.c	2012-08-30 21:54:03.959742978 +0200
++++ linux-3.3.8/drivers/mmc/core/core.c	2012-08-30 21:54:12.667786161 +0200
+@@ -526,10 +526,14 @@
+ 
+ 		if (data->flags & MMC_DATA_WRITE)
+ 			/*
+-			 * The limit is really 250 ms, but that is
+-			 * insufficient for some crappy cards.
++			 * The MMC spec "It is strongly recommended
++			 * for hosts to implement more than 500ms
++			 * timeout value even if the card indicates
++			 * the 250ms maximum busy length."  Even the
++			 * previous value of 300ms is known to be
++			 * insufficient for some cards.
+ 			 */
+-			limit_us = 300000;
++			limit_us = 3000000;
+ 		else
+ 			limit_us = 100000;
+ 

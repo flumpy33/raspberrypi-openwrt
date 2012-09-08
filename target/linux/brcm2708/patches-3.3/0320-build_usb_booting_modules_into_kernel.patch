@@ -1,0 +1,50 @@
+From 2f241bc36303fa94a96811efb07df6ac48a4abe8 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Fri, 27 Apr 2012 00:31:37 +0100
+Subject: [PATCH] Build modules needed for USB booting into kernel
+
+
+diff --git a/arch/arm/configs/bcmrpi_cutdown_defconfig b/arch/arm/configs/bcmrpi_cutdown_defconfig
+index e519412..6732014 100644
+--- a/arch/arm/configs/bcmrpi_cutdown_defconfig
++++ b/arch/arm/configs/bcmrpi_cutdown_defconfig
+@@ -90,7 +90,7 @@ CONFIG_CDROM_PKTCDVD=m
+ CONFIG_MISC_DEVICES=y
+ CONFIG_SCSI=y
+ # CONFIG_SCSI_PROC_FS is not set
+-CONFIG_BLK_DEV_SD=m
++CONFIG_BLK_DEV_SD=y
+ CONFIG_BLK_DEV_SR=m
+ CONFIG_SCSI_MULTI_LUN=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+@@ -292,7 +292,7 @@ CONFIG_USB_STORAGE_ONETOUCH=m
+ CONFIG_USB_STORAGE_KARMA=m
+ CONFIG_USB_STORAGE_CYPRESS_ATACB=m
+ CONFIG_USB_STORAGE_ENE_UB6250=m
+-CONFIG_USB_UAS=m
++CONFIG_USB_UAS=y
+ CONFIG_USB_LIBUSUAL=y
+ CONFIG_USB_MDC800=m
+ CONFIG_USB_MICROTEK=m
+diff --git a/arch/arm/configs/bcmrpi_defconfig b/arch/arm/configs/bcmrpi_defconfig
+index df947e5..fcbf8a5 100644
+--- a/arch/arm/configs/bcmrpi_defconfig
++++ b/arch/arm/configs/bcmrpi_defconfig
+@@ -106,7 +106,7 @@ CONFIG_CDROM_PKTCDVD=m
+ CONFIG_MISC_DEVICES=y
+ CONFIG_SCSI=y
+ # CONFIG_SCSI_PROC_FS is not set
+-CONFIG_BLK_DEV_SD=m
++CONFIG_BLK_DEV_SD=y
+ CONFIG_BLK_DEV_SR=m
+ CONFIG_SCSI_MULTI_LUN=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+@@ -309,7 +309,7 @@ CONFIG_USB_STORAGE_ONETOUCH=m
+ CONFIG_USB_STORAGE_KARMA=m
+ CONFIG_USB_STORAGE_CYPRESS_ATACB=m
+ CONFIG_USB_STORAGE_ENE_UB6250=m
+-CONFIG_USB_UAS=m
++CONFIG_USB_UAS=y
+ CONFIG_USB_LIBUSUAL=y
+ CONFIG_USB_MDC800=m
+ CONFIG_USB_MICROTEK=m

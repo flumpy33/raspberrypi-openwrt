@@ -1,0 +1,29 @@
+From 178f598a8ad9cc2eea1d33e6dc0d05fc80c2d87b Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Fri, 13 Jul 2012 18:34:18 +0100
+Subject: [PATCH] Add temporary fix for hang when quitting X
+
+
+diff --git a/drivers/video/bcm2708_fb.c b/drivers/video/bcm2708_fb.c
+index 2b23be6..e7d93fb 100644
+--- a/drivers/video/bcm2708_fb.c
++++ b/drivers/video/bcm2708_fb.c
+@@ -18,6 +18,7 @@
+ #include <linux/errno.h>
+ #include <linux/string.h>
+ #include <linux/slab.h>
++#include <linux/delay.h>
+ #include <linux/mm.h>
+ #include <linux/fb.h>
+ #include <linux/init.h>
+@@ -221,7 +222,9 @@ static int bcm2708_fb_set_par(struct fb_info *info)
+ 	/* inform vc about new framebuffer */
+ 	bcm_mailbox_write(MBOX_CHAN_FB, fb->dma);
+ 
+-	/* TODO: replace fb driver with vchiq version */
++	/* workaround occasional failure to read results. TODO: fix */
++	msleep(10);
++
+ 	/* wait for response */
+ 	bcm_mailbox_read(MBOX_CHAN_FB, &val);
+ 

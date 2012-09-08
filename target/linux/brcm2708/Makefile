@@ -5,13 +5,12 @@
 # See /LICENSE for more information.
 #
 include $(TOPDIR)/rules.mk
-include $(INCLUDE_DIR)/host.mk
 
 ARCH:=arm
 BOARD:=brcm2708
 BOARDNAME:=Broadcom BCM2708/BCM2835
-FEATURES:=ext4 audio usb usbgadget display gpio
-MAINTAINER:=Ian Ridge <ianridge[at]gmail.com>
+FEATURES:=ext4 audio usb usbgadget display gpio fpu
+MAINTAINER:=Nathan Huizinga <nathan[dot]huizinga[at]gmail.com>
 
 LINUX_VERSION:=3.3.8
 
@@ -23,6 +22,8 @@ define Target/Description
 	Currently produces SD Card image for Raspberry Pi.
 endef
 
-CFLAGS:=-pipe -march=armv6 -mtune=arm1176jzf-s -mfpu=vfp -mfloat-abi=softfp -marm
+CFLAGS:=-O2 -pipe -march=armv6 -mtune=arm1176jzf-s -mfpu=vfp -mfloat-abi=softfp -marm
+
+KERNELNAME:="Image"
 
 $(eval $(call BuildTarget))

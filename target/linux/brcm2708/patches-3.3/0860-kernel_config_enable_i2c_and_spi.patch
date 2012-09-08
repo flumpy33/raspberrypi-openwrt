@@ -1,0 +1,40 @@
+From 5d6442a0b6263ff4eb2c5cc40d30c472be52f481 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Mon, 9 Jul 2012 12:19:26 +0100
+Subject: [PATCH] Enable I2C and SPI modules in full config
+
+
+diff --git a/arch/arm/configs/bcmrpi_cutdown_defconfig b/arch/arm/configs/bcmrpi_cutdown_defconfig
+index cc9e1df..bb8cafe 100644
+--- a/arch/arm/configs/bcmrpi_cutdown_defconfig
++++ b/arch/arm/configs/bcmrpi_cutdown_defconfig
+@@ -550,12 +550,3 @@ CONFIG_CRYPTO_DEFLATE=m
+ # CONFIG_CRYPTO_HW is not set
+ CONFIG_CRC_ITU_T=y
+ CONFIG_LIBCRC32C=y
+-CONFIG_I2C=y
+-CONFIG_I2C_BOARDINFO=y
+-CONFIG_I2C_COMPAT=y
+-CONFIG_I2C_CHARDEV=m
+-CONFIG_I2C_HELPER_AUTO=y
+-CONFIG_I2C_BCM2708=m
+-CONFIG_SPI=y
+-CONFIG_SPI_MASTER=y
+-CONFIG_SPI_BCM2708=m
+\ No newline at end of file
+diff --git a/arch/arm/configs/bcmrpi_defconfig b/arch/arm/configs/bcmrpi_defconfig
+index ba646b6..0820055 100644
+--- a/arch/arm/configs/bcmrpi_defconfig
++++ b/arch/arm/configs/bcmrpi_defconfig
+@@ -381,6 +381,11 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_TTY_PRINTK=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_RAW_DRIVER=y
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=m
++CONFIG_I2C_BCM2708=m
++CONFIG_SPI=y
++CONFIG_SPI_BCM2708=m
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y

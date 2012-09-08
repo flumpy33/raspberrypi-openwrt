@@ -1,0 +1,77 @@
+From 4f574f96955a5f918be460b1b9afe60ad405ba00 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Sat, 30 Jun 2012 16:07:18 +0100
+Subject: [PATCH] Add a pm_power_off function that resets us, and indicates to
+ bootcode.bin not to reboot us. Should allow a lower power
+ 'off' state
+
+
+Index: linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c
+===================================================================
+--- linux-3.3.8.orig/arch/arm/mach-bcm2708/bcm2708.c	2012-08-30 21:53:40.615627233 +0200
++++ linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c	2012-08-30 21:54:49.587969237 +0200
+@@ -52,6 +52,7 @@
+ #include <mach/timex.h>
+ #include <mach/dma.h>
+ #include <mach/vcio.h>
++#include <mach/system.h>
+ 
+ #include "bcm2708.h"
+ #include "armctrl.h"
+@@ -471,10 +472,23 @@
+ 	return ret;
+ }
+ 
++/* We can't really power off, but if we do the normal reset scheme, and indicate to bootcode.bin not to reboot, then most of the chip will be powered off */
++static void bcm2708_power_off(void)
++{
++	/* we set the watchdog hard reset bit here to distinguish this reset from the normal (full) reset. bootcode.bin will not reboot after a hard reset */
++	uint32_t pm_rsts = readl(IO_ADDRESS(PM_RSTS));
++	pm_rsts = PM_PASSWORD | (pm_rsts & PM_RSTC_WRCFG_CLR) | PM_RSTS_HADWRH_SET;
++	writel(pm_rsts, IO_ADDRESS(PM_RSTS));
++	/* continue with normal reset mechanism */
++	arch_reset(0, "");
++}
++
+ void __init bcm2708_init(void)
+ {
+ 	int i;
+ 
++	pm_power_off = bcm2708_power_off;
++
+ 	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+ 		clkdev_add(&lookups[i]);
+ 
+Index: linux-3.3.8/arch/arm/mach-bcm2708/include/mach/platform.h
+===================================================================
+--- linux-3.3.8.orig/arch/arm/mach-bcm2708/include/mach/platform.h	2012-08-30 21:51:00.010830821 +0200
++++ linux-3.3.8/arch/arm/mach-bcm2708/include/mach/platform.h	2012-08-30 21:54:49.587969237 +0200
+@@ -191,6 +191,7 @@
+  * Watchdog
+  */
+ #define PM_RSTC			       (PM_BASE+0x1c)
++#define PM_RSTS			       (PM_BASE+0x20)
+ #define PM_WDOG			       (PM_BASE+0x24)
+ 
+ #define PM_WDOG_RESET                                         0000000000
+@@ -199,9 +200,18 @@
+ #define PM_RSTC_WRCFG_CLR              0xffffffcf
+ #define PM_RSTC_WRCFG_SET              0x00000030
+ #define PM_RSTC_WRCFG_FULL_RESET       0x00000020
+-#define PM_RSTC_RESET			0x00000102
+-
++#define PM_RSTC_RESET                  0x00000102
+ 
++#define PM_RSTS_HADPOR_SET                                 0x00001000
++#define PM_RSTS_HADSRH_SET                                 0x00000400
++#define PM_RSTS_HADSRF_SET                                 0x00000200
++#define PM_RSTS_HADSRQ_SET                                 0x00000100
++#define PM_RSTS_HADWRH_SET                                 0x00000040
++#define PM_RSTS_HADWRF_SET                                 0x00000020
++#define PM_RSTS_HADWRQ_SET                                 0x00000010
++#define PM_RSTS_HADDRH_SET                                 0x00000004
++#define PM_RSTS_HADDRF_SET                                 0x00000002
++#define PM_RSTS_HADDRQ_SET                                 0x00000001
+ 
+ 
+ 
