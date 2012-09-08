@@ -112,7 +112,7 @@
 
 static inline u32 nuport_mac_readl(void __iomem *reg)
 {
-	return __raw_readl(reg);
+	return readl_relaxed(reg);
 }
 
 static inline u8 nuport_mac_readb(void __iomem *reg)
@@ -122,12 +122,12 @@ static inline u8 nuport_mac_readb(void __iomem *reg)
 
 static inline void nuport_mac_writel(u32 value, void __iomem *reg)
 {
-	__raw_writel(value, reg);
+	writel_relaxed(value, reg);
 }
 
 static inline void nuport_mac_writeb(u8 value, void __iomem *reg)
 {
-	__raw_writel(value, reg);
+	writel_relaxed(value, reg);
 }
 
 /* MAC private data */
@@ -829,9 +829,14 @@ out_emac_clk:
 
 static int nuport_mac_close(struct net_device *dev)
 {
+	u32 reg;
 	struct nuport_mac_priv *priv = netdev_priv(dev);
 
 	spin_lock_irq(&priv->lock);
+	reg = nuport_mac_readl(CTRL_REG);
+	reg &= ~(RX_ENABLE | TX_ENABLE);
+	nuport_mac_writel(reg, CTRL_REG);
+
 	napi_disable(&priv->napi);
 	netif_stop_queue(dev);
 

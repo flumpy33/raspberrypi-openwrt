@@ -12,7 +12,7 @@ endef
 
 define Profile/Broadcom-b43/Description
 	Package set compatible with hardware using Broadcom BCM43xx cards
-	using the MAC80211 b43 and b43legacy drivers.
+	using the MAC80211 b43 and b43legacy drivers and b44 Ethernet driver.
 endef
 
 $(eval $(call Profile,Broadcom-b43))

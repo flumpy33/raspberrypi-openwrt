@@ -33,6 +33,9 @@ get_status_led() {
 	alfa-nx)
 		status_led="alfa:green:led_8"
 		;;
+	all0305)
+		status_led="eap7660d:green:ds4"
+		;;
 	ap136)
 		status_led="ap136:green:status"
 		;;
@@ -61,7 +64,9 @@ get_status_led() {
 	dir-615-c1)
 		status_led="d-link:green:status"
 		;;
-	dir-825-b1)
+	dir-825-b1 |\
+	dir-825-b1-openwrt |\
+	dir-825-b1-stock)
 		status_led="d-link:orange:power"
 		;;
 	eap7660d)
@@ -109,6 +114,9 @@ get_status_led() {
 	tew-673gru)
 		status_led="trendnet:blue:wps"
 		;;
+	tew-712br)
+		status_led="trendnet:green:power"
+		;;
 	tl-mr3020)
 		status_led="tp-link:green:wps"
 		;;
@@ -144,6 +152,7 @@ get_status_led() {
 	wlae-ag300n)
 		status_led="buffalo:green:status"
 		;;
+	wzr-hp-ag300h | \
 	wzr-hp-g300nh2)
 		status_led="buffalo:red:diag"
 		;;
