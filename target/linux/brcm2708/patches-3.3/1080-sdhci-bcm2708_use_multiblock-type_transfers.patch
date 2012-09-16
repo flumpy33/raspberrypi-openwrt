@@ -1,0 +1,50 @@
+From 31c350f3e5f77dfd7b36d7428420c545a255a1cc Mon Sep 17 00:00:00 2001
+From: Grigori Goronzy <greg@blackbox>
+Date: Tue, 31 Jul 2012 23:18:12 +0200
+Subject: [PATCH] sdhci-bcm2708: use multiblock-type transfers for single
+ blocks
+
+There are issues with both single block reads (missed completion)
+and writes (data loss in some cases!). Just don't do single block
+transfers anymore, and treat them like multiblock transfers. This
+adds a quirk for this and uses it.
+
+Index: linux-3.3.8/drivers/mmc/card/block.c
+===================================================================
+--- linux-3.3.8.orig/drivers/mmc/card/block.c	2012-06-01 09:16:13.000000000 +0200
++++ linux-3.3.8/drivers/mmc/card/block.c	2012-09-16 21:31:07.295487119 +0200
+@@ -1152,7 +1152,7 @@
+ 			brq->data.blocks = 1;
+ 	}
+ 
+-	if (brq->data.blocks > 1 || do_rel_wr) {
++	if (brq->data.blocks > 1 || do_rel_wr || card->host->caps2 & MMC_CAP2_FORCE_MULTIBLOCK) {
+ 		/* SPI multiblock writes terminate using a special
+ 		 * token, not a STOP_TRANSMISSION request.
+ 		 */
+Index: linux-3.3.8/drivers/mmc/host/sdhci-bcm2708.c
+===================================================================
+--- linux-3.3.8.orig/drivers/mmc/host/sdhci-bcm2708.c	2012-09-16 21:30:38.000000000 +0200
++++ linux-3.3.8/drivers/mmc/host/sdhci-bcm2708.c	2012-09-16 21:31:07.295487119 +0200
+@@ -1392,6 +1392,9 @@
+ 
+     if (allow_highspeed)
+         host->mmc->caps |= MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED;
++
++    /* single block writes cause data loss with some SD cards! */
++    host->mmc->caps2 |= MMC_CAP2_FORCE_MULTIBLOCK;
+ #endif
+ 
+ 	ret = sdhci_add_host(host);
+Index: linux-3.3.8/include/linux/mmc/host.h
+===================================================================
+--- linux-3.3.8.orig/include/linux/mmc/host.h	2012-06-01 09:16:13.000000000 +0200
++++ linux-3.3.8/include/linux/mmc/host.h	2012-09-16 21:33:50.388295850 +0200
+@@ -258,6 +258,7 @@
+ #define MMC_CAP2_HS200		(MMC_CAP2_HS200_1_8V_SDR | \
+ 				 MMC_CAP2_HS200_1_2V_SDR)
+ #define MMC_CAP2_BROKEN_VOLTAGE	(1 << 7)	/* Use the broken voltage */
++#define MMC_CAP2_FORCE_MULTIBLOCK (1 << 8)	/* Always use multiblock transfers */
+ 
+ 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
+ 	unsigned int        power_notify_type;

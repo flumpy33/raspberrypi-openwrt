@@ -1,0 +1,18 @@
+From 7880df43b92e1a99acf14ac421b4a233a1a687ec Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Mon, 13 Aug 2012 20:16:58 +0100
+Subject: [PATCH] Enable CONFIG_CRYPTO_XTS
+
+
+diff --git a/arch/arm/configs/bcmrpi_defconfig b/arch/arm/configs/bcmrpi_defconfig
+index 95ef180..7fd437d 100644
+--- a/arch/arm/configs/bcmrpi_defconfig
++++ b/arch/arm/configs/bcmrpi_defconfig
+@@ -876,6 +876,7 @@ CONFIG_STRICT_DEVMEM=y
+ CONFIG_CRYPTO_AUTHENC=m
+ CONFIG_CRYPTO_SEQIV=m
+ CONFIG_CRYPTO_CBC=y
++CONFIG_CRYPTO_XTS=m
+ CONFIG_CRYPTO_HMAC=y
+ CONFIG_CRYPTO_XCBC=m
+ CONFIG_CRYPTO_MD5=y
