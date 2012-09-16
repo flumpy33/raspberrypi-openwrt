@@ -1,0 +1,1643 @@
+From 93afe723635802e875da48e526c754c13860d537 Mon Sep 17 00:00:00 2001
+From: Chris Boot <bootc@bootc.net>
+Date: Mon, 7 May 2012 10:45:36 +0100
+Subject: [PATCH] dwc_common_port: remove unused cruft with onerous
+ dependencies
+
+The dwc_common_port library used by the dwc_otg includes bignumber and
+crypto functions which require 64x64 multiplication functions. Remove
+this dead code.
+
+Signed-off-by: Chris Boot <bootc@bootc.net>
+
+diff --git a/drivers/usb/host/dwc_common_port/Makefile b/drivers/usb/host/dwc_common_port/Makefile
+index b1a74eb..b593b08 100644
+--- a/drivers/usb/host/dwc_common_port/Makefile
++++ b/drivers/usb/host/dwc_common_port/Makefile
+@@ -12,8 +12,8 @@ endif
+ CPPFLAGS	+= -DDWC_LINUX
+ 
+ obj-$(CONFIG_USB_DWCOTG)	+= dwc_common_port_lib.o
+-dwc_common_port_lib-objs	:= dwc_cc.o dwc_modpow.o dwc_dh.o \
+-				   dwc_crypto.o dwc_notifier.o \
++dwc_common_port_lib-objs	:= dwc_cc.o \
++				   dwc_notifier.o \
+ 				   dwc_common_linux.o dwc_mem.o
+ 
+ kernrelwd := $(subst ., ,$(KERNELRELEASE))
+diff --git a/drivers/usb/host/dwc_common_port/dwc_common_linux.c b/drivers/usb/host/dwc_common_port/dwc_common_linux.c
+index f269b39..8ac42a2 100644
+--- a/drivers/usb/host/dwc_common_port/dwc_common_linux.c
++++ b/drivers/usb/host/dwc_common_port/dwc_common_linux.c
+@@ -1,7 +1,4 @@
+ #include "dwc_cc.h"
+-#include "dwc_modpow.h"
+-#include "dwc_dh.h"
+-#include "dwc_crypto.h"
+ #include "dwc_notifier.h"
+ 
+ #include <linux/kernel.h>
+@@ -51,24 +48,6 @@ EXPORT_SYMBOL(dwc_cc_chid);
+ EXPORT_SYMBOL(dwc_cc_cdid);
+ EXPORT_SYMBOL(dwc_cc_name);
+ 
+-#ifndef CONFIG_MACH_IPMATE
+-/* Modpow */
+-EXPORT_SYMBOL(dwc_modpow);
+-/* DH */
+-EXPORT_SYMBOL(dwc_dh_modpow);
+-EXPORT_SYMBOL(dwc_dh_derive_keys);
+-EXPORT_SYMBOL(dwc_dh_pk);
+-#endif /* CONFIG_MACH_IPMATE  */
+-/* Crypto */
+-EXPORT_SYMBOL(dwc_wusb_aes_encrypt);
+-EXPORT_SYMBOL(dwc_wusb_cmf);
+-EXPORT_SYMBOL(dwc_wusb_prf);
+-EXPORT_SYMBOL(dwc_wusb_fill_ccm_nonce);
+-EXPORT_SYMBOL(dwc_wusb_gen_nonce);
+-EXPORT_SYMBOL(dwc_wusb_gen_key);
+-EXPORT_SYMBOL(dwc_wusb_gen_mic);
+-
+-
+ /* Notification */
+ EXPORT_SYMBOL(dwc_alloc_notification_manager);
+ EXPORT_SYMBOL(dwc_free_notification_manager);
+@@ -96,7 +75,6 @@ EXPORT_SYMBOL(dwc_dma_free_debug);
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/ctype.h>
+-#include <linux/crypto.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/dma-mapping.h>
+@@ -457,93 +435,6 @@ void __DWC_FREE(void *addr)
+ }
+ EXPORT_SYMBOL(__DWC_FREE);
+ 
+-/* dwc_crypto.h */
+-
+-void DWC_RANDOM_BYTES(uint8_t *buffer, uint32_t length)
+-{
+-	get_random_bytes(buffer, length);
+-}
+-EXPORT_SYMBOL(DWC_RANDOM_BYTES);
+-
+-int DWC_AES_CBC(uint8_t *message, uint32_t messagelen, uint8_t *key, uint32_t keylen, uint8_t iv[16], uint8_t *out)
+-{
+-	struct crypto_blkcipher *tfm;
+-	struct blkcipher_desc desc;
+-	struct scatterlist sgd;
+-	struct scatterlist sgs;
+-
+-	tfm = crypto_alloc_blkcipher("cbc(aes)", 0, CRYPTO_ALG_ASYNC);
+-	if (tfm == NULL) {
+-		printk("failed to load transform for aes CBC\n");
+-		return -1;
+-	}
+-
+-	crypto_blkcipher_setkey(tfm, key, keylen);
+-	crypto_blkcipher_set_iv(tfm, iv, 16);
+-
+-	sg_init_one(&sgd, out, messagelen);
+-	sg_init_one(&sgs, message, messagelen);
+-
+-	desc.tfm = tfm;
+-	desc.flags = 0;
+-
+-	if(crypto_blkcipher_encrypt(&desc, &sgd, &sgs, messagelen)) {
+-		crypto_free_blkcipher(tfm);
+-		DWC_ERROR("AES CBC encryption failed");
+-		return -1;
+-	}
+-
+-	crypto_free_blkcipher(tfm);
+-	return 0;
+-}
+-EXPORT_SYMBOL(DWC_AES_CBC);
+-
+-int DWC_SHA256(uint8_t *message, uint32_t len, uint8_t *out)
+-{
+-	struct crypto_hash *tfm;
+-	struct hash_desc desc;
+-	struct scatterlist sg;
+-
+-	tfm = crypto_alloc_hash("sha256", 0, CRYPTO_ALG_ASYNC);
+-	if (IS_ERR(tfm)) {
+-		DWC_ERROR("Failed to load transform for sha256: %ld\n", PTR_ERR(tfm));
+-		return 0;
+-	}
+-	desc.tfm = tfm;
+-	desc.flags = 0;
+-
+-	sg_init_one(&sg, message, len);
+-	crypto_hash_digest(&desc, &sg, len, out);
+-	crypto_free_hash(tfm);
+-
+-	return 1;
+-}
+-EXPORT_SYMBOL(DWC_SHA256);
+-
+-int DWC_HMAC_SHA256(uint8_t *message, uint32_t messagelen,
+-		    uint8_t *key, uint32_t keylen, uint8_t *out)
+-{
+-	struct crypto_hash *tfm;
+-	struct hash_desc desc;
+-	struct scatterlist sg;
+-
+-	tfm = crypto_alloc_hash("hmac(sha256)", 0, CRYPTO_ALG_ASYNC);
+-	if (IS_ERR(tfm)) {
+-		DWC_ERROR("Failed to load transform for hmac(sha256): %ld\n", PTR_ERR(tfm));
+-		return 0;
+-	}
+-	desc.tfm = tfm;
+-	desc.flags = 0;
+-
+-	sg_init_one(&sg, message, messagelen);
+-	crypto_hash_setkey(tfm, key, keylen);
+-	crypto_hash_digest(&desc, &sg, messagelen, out);
+-	crypto_free_hash(tfm);
+-
+-	return 1;
+-}
+-EXPORT_SYMBOL(DWC_HMAC_SHA256);
+-
+ /* Byte Ordering Conversions. */
+ uint32_t DWC_CPU_TO_LE32(void *p)
+ {
+diff --git a/drivers/usb/host/dwc_common_port/dwc_crypto.c b/drivers/usb/host/dwc_common_port/dwc_crypto.c
+deleted file mode 100644
+index 747840e..0000000
+--- a/drivers/usb/host/dwc_common_port/dwc_crypto.c
++++ /dev/null
+@@ -1,306 +0,0 @@
+-/* =========================================================================
+- * $File: //dwh/usb_iip/dev/software/dwc_common_port/dwc_crypto.c $
+- * $Revision: #1 $
+- * $Date: 2008/12/21 $
+- * $Change: 1156609 $
+- *
+- * Synopsys Portability Library Software and documentation
+- * (hereinafter, "Software") is an Unsupported proprietary work of
+- * Synopsys, Inc. unless otherwise expressly agreed to in writing
+- * between Synopsys and you.
+- *
+- * The Software IS NOT an item of Licensed Software or Licensed Product
+- * under any End User Software License Agreement or Agreement for
+- * Licensed Product with Synopsys or any supplement thereto. You are
+- * permitted to use and redistribute this Software in source and binary
+- * forms, with or without modification, provided that redistributions
+- * of source code must retain this notice. You may not view, use,
+- * disclose, copy or distribute this file or any information contained
+- * herein except pursuant to this license grant from Synopsys. If you
+- * do not agree with this notice, including the disclaimer below, then
+- * you are not authorized to use the Software.
+- *
+- * THIS SOFTWARE IS BEING DISTRIBUTED BY SYNOPSYS SOLELY ON AN "AS IS"
+- * BASIS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+- * FOR A PARTICULAR PURPOSE ARE HEREBY DISCLAIMED. IN NO EVENT SHALL
+- * SYNOPSYS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+- * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+- * DAMAGE.
+- * ========================================================================= */
+-
+-/** @file
+- * This file contains the WUSB cryptographic routines.
+- */
+-
+-#include "dwc_crypto.h"
+-#include "usb.h"
+-
+-#ifdef DEBUG
+-static inline void dump_bytes(char *name, uint8_t *bytes, int len)
+-{
+-	int i;
+-	DWC_PRINTF("%s: ", name);
+-	for (i=0; i<len; i++) {
+-		DWC_PRINTF("%02x ", bytes[i]);
+-	}
+-	DWC_PRINTF("\n");
+-}
+-#else
+-#define dump_bytes(x...)
+-#endif
+-
+-/* Display a block */
+-void show_block(const u8 *blk, const char *prefix, const char *suffix, int a)
+-{
+-#ifdef DEBUG_CRYPTO
+-	int i, blksize = 16;
+-
+-	DWC_DEBUG("%s", prefix);
+-
+-	if (suffix == NULL) {
+-		suffix = "\n";
+-		blksize = a;
+-	}
+-
+-	for (i = 0; i < blksize; i++)
+-		DWC_PRINT("%02x%s", *blk++, ((i & 3) == 3) ? "  " : " ");
+-	DWC_PRINT(suffix);
+-
+-#endif
+-}
+-
+-/**
+- * Encrypts an array of bytes using the AES encryption engine.
+- * If <code>dst</code> == <code>src</code>, then the bytes will be encrypted
+- * in-place.
+- *
+- * @return  0 on success, negative error code on error.
+- */
+-int dwc_wusb_aes_encrypt(u8 *src, u8 *key, u8 *dst)
+-{
+-	u8 block_t[16];
+-	DWC_MEMSET(block_t, 0, 16);
+-
+-	return DWC_AES_CBC(src, 16, key, 16, block_t, dst);
+-}
+-
+-/**
+- * The CCM-MAC-FUNCTION described in section 6.5 of the WUSB spec.
+- * This function takes a data string and returns the encrypted CBC
+- * Counter-mode MIC.
+- *
+- * @param key     The 128-bit symmetric key.
+- * @param nonce   The CCM nonce.
+- * @param label   The unique 14-byte ASCII text label.
+- * @param bytes   The byte array to be encrypted.
+- * @param len     Length of the byte array.
+- * @param result  Byte array to receive the 8-byte encrypted MIC.
+- */
+-void dwc_wusb_cmf(u8 *key, u8 *nonce,
+-		  char *label, u8 *bytes, int len, u8 *result)
+-{
+-	u8 block_m[16];
+-	u8 block_x[16];
+-	u8 block_t[8];
+-	int idx, blkNum;
+-	u16 la = (u16)(len + 14);
+-
+-	/* Set the AES-128 key */
+-	//dwc_aes_setkey(tfm, key, 16);
+-
+-	/* Fill block B0 from flags = 0x59, N, and l(m) = 0 */
+-	block_m[0] = 0x59;
+-	for (idx = 0; idx < 13; idx++)
+-		block_m[idx + 1] = nonce[idx];
+-	block_m[14] = 0;
+-	block_m[15] = 0;
+-
+-	/* Produce the CBC IV */
+-	dwc_wusb_aes_encrypt(block_m, key, block_x);
+-	show_block(block_m, "CBC IV in: ", "\n", 0);
+-	show_block(block_x, "CBC IV out:", "\n", 0);
+-
+-	/* Fill block B1 from l(a) = Blen + 14, and A */
+-	block_x[0] ^= (u8)(la >> 8);
+-	block_x[1] ^= (u8)la;
+-	for (idx = 0; idx < 14; idx++)
+-		block_x[idx + 2] ^= label[idx];
+-	show_block(block_x, "After xor: ", "b1\n", 16);
+-
+-	dwc_wusb_aes_encrypt(block_x, key, block_x);
+-	show_block(block_x, "After AES: ", "b1\n", 16);
+-
+-	idx = 0;
+-	blkNum = 0;
+-
+-	/* Fill remaining blocks with B */
+-	while (len-- > 0) {
+-		block_x[idx] ^= *bytes++;
+-		if (++idx >= 16) {
+-			idx = 0;
+-			show_block(block_x, "After xor: ", "\n", blkNum);
+-			dwc_wusb_aes_encrypt(block_x, key, block_x);
+-			show_block(block_x, "After AES: ", "\n", blkNum);
+-			blkNum++;
+-		}
+-	}
+-
+-	/* Handle partial last block */
+-	if (idx > 0) {
+-		show_block(block_x, "After xor: ", "\n", blkNum);
+-		dwc_wusb_aes_encrypt(block_x, key, block_x);
+-		show_block(block_x, "After AES: ", "\n", blkNum);
+-	}
+-
+-	/* Save the MIC tag */
+-	DWC_MEMCPY(block_t, block_x, 8);
+-	show_block(block_t, "MIC tag  : ", NULL, 8);
+-
+-	/* Fill block A0 from flags = 0x01, N, and counter = 0 */
+-	block_m[0] = 0x01;
+-	block_m[14] = 0;
+-	block_m[15] = 0;
+-
+-	/* Encrypt the counter */
+-	dwc_wusb_aes_encrypt(block_m, key, block_x);
+-	show_block(block_x, "CTR[MIC] : ", NULL, 8);
+-
+-	/* XOR with MIC tag */
+-	for (idx = 0; idx < 8; idx++) {
+-		block_t[idx] ^= block_x[idx];
+-	}
+-
+-	/* Return result to caller */
+-	DWC_MEMCPY(result, block_t, 8);
+-	show_block(result, "CCM-MIC  : ", NULL, 8);
+-
+-}
+-
+-/**
+- * The PRF function described in section 6.5 of the WUSB spec. This function
+- * concatenates MIC values returned from dwc_cmf() to create a value of
+- * the requested length.
+- *
+- * @param prf_len  Length of the PRF function in bits (64, 128, or 256).
+- * @param key, nonce, label, bytes, len  Same as for dwc_cmf().
+- * @param result   Byte array to receive the result.
+- */
+-void dwc_wusb_prf(int prf_len, u8 *key,
+-		  u8 *nonce, char *label, u8 *bytes, int len, u8 *result)
+-{
+-	int i;
+-
+-	nonce[0] = 0;
+-	for (i = 0; i < prf_len >> 6; i++, nonce[0]++) {
+-		dwc_wusb_cmf(key, nonce, label, bytes, len, result);
+-		result += 8;
+-	}
+-}
+-
+-/**
+- * Fills in CCM Nonce per the WUSB spec.
+- *
+- * @param[in] haddr Host address.
+- * @param[in] daddr Device address.
+- * @param[in] tkid Session Key(PTK) identifier.
+- * @param[out] nonce Pointer to where the CCM Nonce output is to be written.
+- */
+-void dwc_wusb_fill_ccm_nonce(uint16_t haddr, uint16_t daddr, uint8_t *tkid,
+-			     uint8_t *nonce)
+-{
+-
+-	DWC_DEBUG("%s %x %x\n", __func__, daddr, haddr);
+-
+-	DWC_MEMSET(&nonce[0], 0, 16);
+-
+-	DWC_MEMCPY(&nonce[6], tkid, 3);
+-	nonce[9] = daddr & 0xFF;
+-	nonce[10] = (daddr >> 8) & 0xFF;
+-	nonce[11] = haddr & 0xFF;
+-	nonce[12] = (haddr >> 8) & 0xFF;
+-
+-	dump_bytes("CCM nonce", nonce, 16);
+-}
+-
+-/**
+- * Generates a 16-byte cryptographic-grade random number for the Host/Device
+- * Nonce.
+- */
+-void dwc_wusb_gen_nonce(uint16_t addr, uint8_t *nonce)
+-{
+-	uint8_t inonce[16];
+-	uint32_t temp[4];
+-
+-	/* Fill in the Nonce */
+-	DWC_MEMSET(&inonce[0], 0, sizeof(inonce));
+-	inonce[9] = addr & 0xFF;
+-	inonce[10] = (addr >> 8) & 0xFF;
+-	inonce[11] = inonce[9];
+-	inonce[12] = inonce[10];
+-
+-	/* Collect "randomness samples" */
+-	DWC_RANDOM_BYTES((uint8_t *)temp, 16);
+-
+-	dwc_wusb_prf_128((uint8_t *)temp, nonce,
+-			 "Random Numbers", (uint8_t *)temp, sizeof(temp),
+-			 nonce);
+-}
+-
+-/**
+- * Generates the Session Key (PTK) and Key Confirmation Key (KCK) per the
+- * WUSB spec.
+- *
+- * @param[in] ccm_nonce Pointer to CCM Nonce.
+- * @param[in] mk Master Key to derive the session from
+- * @param[in] hnonce Pointer to Host Nonce.
+- * @param[in] dnonce Pointer to Device Nonce.
+- * @param[out] kck Pointer to where the KCK output is to be written.
+- * @param[out] ptk Pointer to where the PTK output is to be written.
+- */
+-void dwc_wusb_gen_key(uint8_t *ccm_nonce, uint8_t *mk, uint8_t *hnonce,
+-		      uint8_t *dnonce, uint8_t *kck, uint8_t *ptk)
+-{
+-	uint8_t idata[32];
+-	uint8_t odata[32];
+-
+-	dump_bytes("ck", mk, 16);
+-	dump_bytes("hnonce", hnonce, 16);
+-	dump_bytes("dnonce", dnonce, 16);
+-
+-	/* The data is the HNonce and DNonce concatenated */
+-	DWC_MEMCPY(&idata[0], hnonce, 16);
+-	DWC_MEMCPY(&idata[16], dnonce, 16);
+-
+-	dwc_wusb_prf_256(mk, ccm_nonce, "Pair-wise keys", idata, 32, odata);
+-
+-	/* Low 16 bytes of the result is the KCK, high 16 is the PTK */
+-	DWC_MEMCPY(kck, &odata[0], 16);
+-	DWC_MEMCPY(ptk, &odata[16], 16);
+-
+-	dump_bytes("kck", kck, 16);
+-	dump_bytes("ptk", ptk, 16);
+-}
+-
+-/**
+- * Generates the Message Integrity Code over the Handshake data per the
+- * WUSB spec.
+- *
+- * @param ccm_nonce Pointer to CCM Nonce.
+- * @param kck   Pointer to Key Confirmation Key.
+- * @param data  Pointer to Handshake data to be checked.
+- * @param mic   Pointer to where the MIC output is to be written.
+- */
+-void dwc_wusb_gen_mic(uint8_t *ccm_nonce, uint8_t *kck,
+-		      uint8_t *data, uint8_t *mic)
+-{
+-
+-	dwc_wusb_prf_64(kck, ccm_nonce, "out-of-bandMIC",
+-			data, WUSB_HANDSHAKE_LEN_FOR_MIC, mic);
+-}
+-
+diff --git a/drivers/usb/host/dwc_common_port/dwc_crypto.h b/drivers/usb/host/dwc_common_port/dwc_crypto.h
+deleted file mode 100644
+index 219d961..0000000
+--- a/drivers/usb/host/dwc_common_port/dwc_crypto.h
++++ /dev/null
+@@ -1,103 +0,0 @@
+-/* =========================================================================
+- * $File: //dwh/usb_iip/dev/software/dwc_common_port/dwc_crypto.h $
+- * $Revision: #1 $
+- * $Date: 2008/12/21 $
+- * $Change: 1156609 $
+- *
+- * Synopsys Portability Library Software and documentation
+- * (hereinafter, "Software") is an Unsupported proprietary work of
+- * Synopsys, Inc. unless otherwise expressly agreed to in writing
+- * between Synopsys and you.
+- *
+- * The Software IS NOT an item of Licensed Software or Licensed Product
+- * under any End User Software License Agreement or Agreement for
+- * Licensed Product with Synopsys or any supplement thereto. You are
+- * permitted to use and redistribute this Software in source and binary
+- * forms, with or without modification, provided that redistributions
+- * of source code must retain this notice. You may not view, use,
+- * disclose, copy or distribute this file or any information contained
+- * herein except pursuant to this license grant from Synopsys. If you
+- * do not agree with this notice, including the disclaimer below, then
+- * you are not authorized to use the Software.
+- *
+- * THIS SOFTWARE IS BEING DISTRIBUTED BY SYNOPSYS SOLELY ON AN "AS IS"
+- * BASIS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+- * FOR A PARTICULAR PURPOSE ARE HEREBY DISCLAIMED. IN NO EVENT SHALL
+- * SYNOPSYS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+- * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+- * DAMAGE.
+- * ========================================================================= */
+-
+-#ifndef _DWC_CRYPTO_H_
+-#define _DWC_CRYPTO_H_
+-
+-/** @file
+- *
+- * This file contains declarations for the WUSB Cryptographic routines as
+- * defined in the WUSB spec.  They are only to be used internally by the DWC UWB
+- * modules.
+- */
+-
+-#include "dwc_os.h"
+-
+-int dwc_wusb_aes_encrypt(u8 *src, u8 *key, u8 *dst);
+-
+-void dwc_wusb_cmf(u8 *key, u8 *nonce,
+-		  char *label, u8 *bytes, int len, u8 *result);
+-void dwc_wusb_prf(int prf_len, u8 *key,
+-		  u8 *nonce, char *label, u8 *bytes, int len, u8 *result);
+-
+-/**
+- * The PRF-64 function described in section 6.5 of the WUSB spec.
+- *
+- * @param key, nonce, label, bytes, len, result  Same as for dwc_prf().
+- */
+-static inline void dwc_wusb_prf_64(u8 *key, u8 *nonce,
+-				   char *label, u8 *bytes, int len, u8 *result)
+-{
+-	dwc_wusb_prf(64, key, nonce, label, bytes, len, result);
+-}
+-
+-/**
+- * The PRF-128 function described in section 6.5 of the WUSB spec.
+- *
+- * @param key, nonce, label, bytes, len, result  Same as for dwc_prf().
+- */
+-static inline void dwc_wusb_prf_128(u8 *key, u8 *nonce,
+-				    char *label, u8 *bytes, int len, u8 *result)
+-{
+-	dwc_wusb_prf(128, key, nonce, label, bytes, len, result);
+-}
+-
+-/**
+- * The PRF-256 function described in section 6.5 of the WUSB spec.
+- *
+- * @param key, nonce, label, bytes, len, result  Same as for dwc_prf().
+- */
+-static inline void dwc_wusb_prf_256(u8 *key, u8 *nonce,
+-				    char *label, u8 *bytes, int len, u8 *result)
+-{
+-	dwc_wusb_prf(256, key, nonce, label, bytes, len, result);
+-}
+-
+-
+-void dwc_wusb_fill_ccm_nonce(uint16_t haddr, uint16_t daddr, uint8_t *tkid,
+-			       uint8_t *nonce);
+-void dwc_wusb_gen_nonce(uint16_t addr,
+-			  uint8_t *nonce);
+-
+-void dwc_wusb_gen_key(uint8_t *ccm_nonce, uint8_t *mk,
+-			uint8_t *hnonce, uint8_t *dnonce,
+-			uint8_t *kck, uint8_t *ptk);
+-
+-
+-void dwc_wusb_gen_mic(uint8_t *ccm_nonce, uint8_t
+-			*kck, uint8_t *data, uint8_t *mic);
+-
+-#endif /* _DWC_CRYPTO_H_ */
+diff --git a/drivers/usb/host/dwc_common_port/dwc_dh.c b/drivers/usb/host/dwc_common_port/dwc_dh.c
+deleted file mode 100644
+index 9529b6a..0000000
+--- a/drivers/usb/host/dwc_common_port/dwc_dh.c
++++ /dev/null
+@@ -1,286 +0,0 @@
+-/* =========================================================================
+- * $File: //dwh/usb_iip/dev/software/dwc_common_port/dwc_dh.c $
+- * $Revision: #1 $
+- * $Date: 2008/12/21 $
+- * $Change: 1156609 $
+- *
+- * Synopsys Portability Library Software and documentation
+- * (hereinafter, "Software") is an Unsupported proprietary work of
+- * Synopsys, Inc. unless otherwise expressly agreed to in writing
+- * between Synopsys and you.
+- *
+- * The Software IS NOT an item of Licensed Software or Licensed Product
+- * under any End User Software License Agreement or Agreement for
+- * Licensed Product with Synopsys or any supplement thereto. You are
+- * permitted to use and redistribute this Software in source and binary
+- * forms, with or without modification, provided that redistributions
+- * of source code must retain this notice. You may not view, use,
+- * disclose, copy or distribute this file or any information contained
+- * herein except pursuant to this license grant from Synopsys. If you
+- * do not agree with this notice, including the disclaimer below, then
+- * you are not authorized to use the Software.
+- *
+- * THIS SOFTWARE IS BEING DISTRIBUTED BY SYNOPSYS SOLELY ON AN "AS IS"
+- * BASIS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+- * FOR A PARTICULAR PURPOSE ARE HEREBY DISCLAIMED. IN NO EVENT SHALL
+- * SYNOPSYS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+- * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+- * DAMAGE.
+- * ========================================================================= */
+-#ifndef CONFIG_MACH_IPMATE
+-#include "dwc_dh.h"
+-#include "dwc_modpow.h"
+-
+-#ifdef DEBUG
+-/* This function prints out a buffer in the format described in the Association
+- * Model specification. */
+-static void dh_dump(char *str, void *_num, int len)
+-{
+-	uint8_t *num = _num;
+-	int i;
+-	DWC_PRINTF("%s\n", str);
+-	for (i = 0; i < len; i ++) {
+-		DWC_PRINTF("%02x", num[i]);
+-		if (((i + 1) % 2) == 0) DWC_PRINTF(" ");
+-		if (((i + 1) % 26) == 0) DWC_PRINTF("\n");
+-	}
+-
+-	DWC_PRINTF("\n");
+-}
+-#else
+-#define dh_dump(_x...) do {; } while(0)
+-#endif
+-
+-/* Constant g value */
+-static __u32 dh_g[] = {
+-	0x02000000,
+-};
+-
+-/* Constant p value */
+-static __u32 dh_p[] = {
+-	0xFFFFFFFF, 0xFFFFFFFF, 0xA2DA0FC9, 0x34C26821, 0x8B62C6C4, 0xD11CDC80, 0x084E0229, 0x74CC678A,
+-	0xA6BE0B02, 0x229B133B, 0x79084A51, 0xDD04348E, 0xB31995EF, 0x1B433ACD, 0x6D0A2B30, 0x37145FF2,
+-	0x6D35E14F, 0x45C2516D, 0x76B585E4, 0xC67E5E62, 0xE9424CF4, 0x6BED37A6, 0xB65CFF0B, 0xEDB706F4,
+-	0xFB6B38EE, 0xA59F895A, 0x11249FAE, 0xE61F4B7C, 0x51662849, 0x3D5BE4EC, 0xB87C00C2, 0x05BF63A1,
+-	0x3648DA98, 0x9AD3551C, 0xA83F1669, 0x5FCF24FD, 0x235D6583, 0x96ADA3DC, 0x56F3621C, 0xBB528520,
+-	0x0729D59E, 0x6D969670, 0x4E350C67, 0x0498BC4A, 0x086C74F1, 0x7C2118CA, 0x465E9032, 0x3BCE362E,
+-	0x2C779EE3, 0x03860E18, 0xA283279B, 0x8FA207EC, 0xF05DC5B5, 0xC9524C6F, 0xF6CB2BDE, 0x18175895,
+-	0x7C499539, 0xE56A95EA, 0x1826D215, 0x1005FA98, 0x5A8E7215, 0x2DC4AA8A, 0x0D1733AD, 0x337A5004,
+-	0xAB2155A8, 0x64BA1CDF, 0x0485FBEC, 0x0AEFDB58, 0x5771EA8A, 0x7D0C065D, 0x850F97B3, 0xC7E4E1A6,
+-	0x8CAEF5AB, 0xD73309DB, 0xE0948C1E, 0x9D61254A, 0x26D2E3CE, 0x6BEED21A, 0x06FA2FF1, 0x64088AD9,
+-	0x730276D8, 0x646AC83E, 0x182B1F52, 0x0C207B17, 0x5717E1BB, 0x6C5D617A, 0xC0880977, 0xE246D9BA,
+-	0xA04FE208, 0x31ABE574, 0xFC5BDB43, 0x8E10FDE0, 0x20D1824B, 0xCAD23AA9, 0xFFFFFFFF, 0xFFFFFFFF,
+-};
+-
+-static void dh_swap_bytes(void *_in, void *_out, uint32_t len)
+-{
+-	uint8_t *in = _in;
+-	uint8_t *out = _out;
+-	int i;
+-	for (i=0; i<len; i++) {
+-		out[i] = in[len-1-i];
+-	}
+-}
+-
+-/* Computes the modular exponentiation (num^exp % mod).  num, exp, and mod are
+- * big endian numbers of size len, in bytes.  Each len value must be a multiple
+- * of 4. */
+-int dwc_dh_modpow(void *num, uint32_t num_len,
+-			 void *exp, uint32_t exp_len,
+-			 void *mod, uint32_t mod_len,
+-			 void *out)
+-{
+-	/* modpow() takes little endian numbers.  AM uses big-endian.  This
+-	 * function swaps bytes of numbers before passing onto modpow. */
+-
+-	int retval = 0;
+-	uint32_t *result;
+-
+-	uint32_t *bignum_num = DWC_ALLOC(num_len + 4);
+-	uint32_t *bignum_exp = DWC_ALLOC(exp_len + 4);
+-	uint32_t *bignum_mod = DWC_ALLOC(mod_len + 4);
+-
+-	dh_swap_bytes(num, &bignum_num[1], num_len);
+-	bignum_num[0] = num_len / 4;
+-
+-	dh_swap_bytes(exp, &bignum_exp[1], exp_len);
+-	bignum_exp[0] = exp_len / 4;
+-
+-	dh_swap_bytes(mod, &bignum_mod[1], mod_len);
+-	bignum_mod[0] = mod_len / 4;
+-
+-	result = dwc_modpow(bignum_num, bignum_exp, bignum_mod);
+-	if (!result) {
+-		retval = -1;
+-		goto dh_modpow_nomem;
+-	}
+-
+-	dh_swap_bytes(&result[1], out, result[0] * 4);
+-	DWC_FREE(result);
+-
+- dh_modpow_nomem:
+-	DWC_FREE(bignum_num);
+-	DWC_FREE(bignum_exp);
+-	DWC_FREE(bignum_mod);
+-	return retval;
+-}
+-
+-
+-int dwc_dh_pk(uint8_t nd, uint8_t *exp, uint8_t *pk, uint8_t *hash)
+-{
+-	int retval;
+-	uint8_t m3[385];
+-
+-#ifndef DH_TEST_VECTORS
+-	DWC_RANDOM_BYTES(exp, 32);
+-#endif
+-
+-	/* Compute the pkd */
+-	if ((retval = dwc_dh_modpow(dh_g, 4,
+-					  exp, 32,
+-					  dh_p, 384, pk))) {
+-		return retval;
+-	}
+-
+-	m3[384] = nd;
+-	DWC_MEMCPY(&m3[0], pk, 384);
+-	DWC_SHA256(m3, 385, hash);
+-
+- 	dh_dump("PK", pk, 384);
+- 	dh_dump("SHA-256(M3)", hash, 32);
+-	return 0;
+-}
+-
+-int dwc_dh_derive_keys(uint8_t nd, uint8_t *pkh, uint8_t *pkd,
+-			     uint8_t *exp, int is_host,
+-			     char *dd, uint8_t *ck, uint8_t *kdk)
+-{
+-	int retval;
+-	uint8_t mv[784];
+-	uint8_t sha_result[32];
+-	uint8_t dhkey[384];
+-	uint8_t shared_secret[384];
+-	char *message;
+-	uint32_t vd;
+-
+-	uint8_t *pk;
+-
+-	if (is_host) {
+-		pk = pkd;
+-	}
+-	else {
+-		pk = pkh;
+-	}
+-
+-	if ((retval = dwc_dh_modpow(pk, 384,
+-					  exp, 32,
+-					  dh_p, 384, shared_secret))) {
+-		return retval;
+-	}
+-	dh_dump("Shared Secret", shared_secret, 384);
+-
+-	DWC_SHA256(shared_secret, 384, dhkey);
+-	dh_dump("DHKEY", dhkey, 384);
+-
+-	DWC_MEMCPY(&mv[0], pkd, 384);
+-	DWC_MEMCPY(&mv[384], pkh, 384);
+-	DWC_MEMCPY(&mv[768], "displayed digest", 16);
+-	dh_dump("MV", mv, 784);
+-
+-	DWC_SHA256(mv, 784, sha_result);
+-	dh_dump("SHA-256(MV)", sha_result, 32);
+-	dh_dump("First 32-bits of SHA-256(MV)", sha_result, 4);
+-
+-	dh_swap_bytes(sha_result, &vd, 4);
+-#ifdef DEBUG
+-	DWC_PRINTF("Vd (decimal) = %d\n", vd);
+-#endif
+-
+-	switch (nd) {
+-	case 2:
+-		vd = vd % 100;
+-		DWC_SPRINTF(dd, "%02d", vd);
+-		break;
+-	case 3:
+-		vd = vd % 1000;
+-		DWC_SPRINTF(dd, "%03d", vd);
+-		break;
+-	case 4:
+-		vd = vd % 10000;
+-		DWC_SPRINTF(dd, "%04d", vd);
+-		break;
+-	}
+-#ifdef DEBUG
+-	DWC_PRINTF("Display Digits: %s\n", dd);
+-#endif
+-
+-	message = "connection key";
+-	DWC_HMAC_SHA256(message, DWC_STRLEN(message), dhkey, 32, sha_result);
+- 	dh_dump("HMAC(SHA-256, DHKey, connection key)", sha_result, 32);
+-	DWC_MEMCPY(ck, sha_result, 16);
+-
+-	message = "key derivation key";
+-	DWC_HMAC_SHA256(message, DWC_STRLEN(message), dhkey, 32, sha_result);
+- 	dh_dump("HMAC(SHA-256, DHKey, key derivation key)", sha_result, 32);
+-	DWC_MEMCPY(kdk, sha_result, 32);
+-
+-	return 0;
+-}
+-
+-
+-#ifdef DH_TEST_VECTORS
+-
+-static __u8 dh_a[] = {
+-	0x44, 0x00, 0x51, 0xd6,
+-	0xf0, 0xb5, 0x5e, 0xa9,
+-	0x67, 0xab, 0x31, 0xc6,
+-	0x8a, 0x8b, 0x5e, 0x37,
+-	0xd9, 0x10, 0xda, 0xe0,
+-	0xe2, 0xd4, 0x59, 0xa4,
+-	0x86, 0x45, 0x9c, 0xaa,
+-	0xdf, 0x36, 0x75, 0x16,
+-};
+-
+-static __u8 dh_b[] = {
+-	0x5d, 0xae, 0xc7, 0x86,
+-	0x79, 0x80, 0xa3, 0x24,
+-	0x8c, 0xe3, 0x57, 0x8f,
+-	0xc7, 0x5f, 0x1b, 0x0f,
+-	0x2d, 0xf8, 0x9d, 0x30,
+-	0x6f, 0xa4, 0x52, 0xcd,
+-	0xe0, 0x7a, 0x04, 0x8a,
+-	0xde, 0xd9, 0x26, 0x56,
+-};
+-
+-void dwc_run_dh_test_vectors(void)
+-{
+-	uint8_t pkd[384];
+-	uint8_t pkh[384];
+-	uint8_t hashd[32];
+-	uint8_t hashh[32];
+-	uint8_t ck[16];
+-	uint8_t kdk[32];
+-	char dd[5];
+-
+-	DWC_PRINTF("\n\n\nDH_TEST_VECTORS\n\n");
+-
+-	/* compute the PKd and SHA-256(PKd || Nd) */
+-	DWC_PRINTF("Computing PKd\n");
+-	dwc_dh_pk(2, dh_a, pkd, hashd);
+-
+-	/* compute the PKd and SHA-256(PKh || Nd) */
+-	DWC_PRINTF("Computing PKh\n");
+-	dwc_dh_pk(2, dh_b, pkh, hashh);
+-
+-	/* compute the dhkey */
+-	dwc_dh_derive_keys(2, pkh, pkd, dh_a, 0, dd, ck, kdk);
+-}
+-#endif /* DH_TEST_VECTORS */
+-
+-#endif /* CONFIG_IPMATE_MACH */
+diff --git a/drivers/usb/host/dwc_common_port/dwc_dh.h b/drivers/usb/host/dwc_common_port/dwc_dh.h
+deleted file mode 100644
+index 5a0e0cd..0000000
+--- a/drivers/usb/host/dwc_common_port/dwc_dh.h
++++ /dev/null
+@@ -1,98 +0,0 @@
+-/* =========================================================================
+- * $File: //dwh/usb_iip/dev/software/dwc_common_port/dwc_dh.h $
+- * $Revision: #1 $
+- * $Date: 2008/12/21 $
+- * $Change: 1156609 $
+- *
+- * Synopsys Portability Library Software and documentation
+- * (hereinafter, "Software") is an Unsupported proprietary work of
+- * Synopsys, Inc. unless otherwise expressly agreed to in writing
+- * between Synopsys and you.
+- *
+- * The Software IS NOT an item of Licensed Software or Licensed Product
+- * under any End User Software License Agreement or Agreement for
+- * Licensed Product with Synopsys or any supplement thereto. You are
+- * permitted to use and redistribute this Software in source and binary
+- * forms, with or without modification, provided that redistributions
+- * of source code must retain this notice. You may not view, use,
+- * disclose, copy or distribute this file or any information contained
+- * herein except pursuant to this license grant from Synopsys. If you
+- * do not agree with this notice, including the disclaimer below, then
+- * you are not authorized to use the Software.
+- *
+- * THIS SOFTWARE IS BEING DISTRIBUTED BY SYNOPSYS SOLELY ON AN "AS IS"
+- * BASIS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+- * FOR A PARTICULAR PURPOSE ARE HEREBY DISCLAIMED. IN NO EVENT SHALL
+- * SYNOPSYS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+- * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+- * DAMAGE.
+- * ========================================================================= */
+-#ifndef _DWC_DH_H_
+-#define _DWC_DH_H_
+-
+-#include "dwc_os.h"
+-
+-/** @file
+- *
+- * This file defines the common functions on device and host for performing
+- * numeric association as defined in the WUSB spec.  They are only to be
+- * used internally by the DWC UWB modules. */
+-
+-extern int dwc_dh_sha256(uint8_t *message, uint32_t len, uint8_t *out);
+-extern int dwc_dh_hmac_sha256(uint8_t *message, uint32_t messagelen,
+-				     uint8_t *key, uint32_t keylen,
+-				     uint8_t *out);
+-extern int dwc_dh_modpow(void *num, uint32_t num_len,
+-			       void *exp, uint32_t exp_len,
+-			       void *mod, uint32_t mod_len,
+-			       void *out);
+-
+-/** Computes PKD or PKH, and SHA-256(PKd || Nd)
+- *
+- * PK = g^exp mod p.
+- *
+- * Input:
+- * Nd = Number of digits on the device.
+- *
+- * Output:
+- * exp = A 32-byte buffer to be filled with a randomly generated number.
+- *       used as either A or B.
+- * pk = A 384-byte buffer to be filled with the PKH or PKD.
+- * hash = A 32-byte buffer to be filled with SHA-256(PK || ND).
+- */
+-extern int dwc_dh_pk(uint8_t nd, uint8_t *exp, uint8_t *pkd, uint8_t *hash);
+-
+-/** Computes the DHKEY, and VD.
+- *
+- * If called from host, then it will comput DHKEY=PKD^exp % p.
+- * If called from device, then it will comput DHKEY=PKH^exp % p.
+- *
+- * Input:
+- * pkd = The PKD value.
+- * pkh = The PKH value.
+- * exp = The A value (if device) or B value (if host) generated in dwc_wudev_dh_pk.
+- * is_host = Set to non zero if a WUSB host is calling this function.
+- *
+- * Output:
+-
+- * dd = A pointer to an buffer to be set to the displayed digits string to be shown
+- *      to the user.  This buffer should be at 5 bytes long to hold 4 digits plus a
+- *      null termination character.  This buffer can be used directly for display.
+- * ck = A 16-byte buffer to be filled with the CK.
+- * kdk = A 32-byte buffer to be filled with the KDK.
+- */
+-extern int dwc_dh_derive_keys(uint8_t nd, uint8_t *pkh, uint8_t *pkd,
+-			      uint8_t *exp, int is_host,
+-			      char *dd, uint8_t *ck, uint8_t *kdk);
+-
+-#ifdef DH_TEST_VECTORS
+-extern void dwc_run_dh_test_vectors(void);
+-#endif
+-
+-#endif /* _DWC_DH_H_ */
+diff --git a/drivers/usb/host/dwc_common_port/dwc_modpow.c b/drivers/usb/host/dwc_common_port/dwc_modpow.c
+deleted file mode 100644
+index 563332d..0000000
+--- a/drivers/usb/host/dwc_common_port/dwc_modpow.c
++++ /dev/null
+@@ -1,622 +0,0 @@
+-/* Bignum routines adapted from PUTTY sources.  PuTTY copyright notice follows.
+- *
+- * PuTTY is copyright 1997-2007 Simon Tatham.
+- *
+- * Portions copyright Robert de Bath, Joris van Rantwijk, Delian
+- * Delchev, Andreas Schultz, Jeroen Massar, Wez Furlong, Nicolas Barry,
+- * Justin Bradford, Ben Harris, Malcolm Smith, Ahmad Khalifa, Markus
+- * Kuhn, and CORE SDI S.A.
+- *
+- * Permission is hereby granted, free of charge, to any person
+- * obtaining a copy of this software and associated documentation files
+- * (the "Software"), to deal in the Software without restriction,
+- * including without limitation the rights to use, copy, modify, merge,
+- * publish, distribute, sublicense, and/or sell copies of the Software,
+- * and to permit persons to whom the Software is furnished to do so,
+- * subject to the following conditions:
+- *
+- * The above copyright notice and this permission notice shall be
+- * included in all copies or substantial portions of the Software.
+-
+- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- * NONINFRINGEMENT.  IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE
+- * FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+- * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+- *
+- */
+-
+-#ifndef CONFIG_MACH_IPMATE
+-
+-
+-#include "dwc_modpow.h"
+-
+-#define BIGNUM_INT_MASK  0xFFFFFFFFUL
+-#define BIGNUM_TOP_BIT   0x80000000UL
+-#define BIGNUM_INT_BITS  32
+-
+-
+-static void *snmalloc(size_t n, size_t size)
+-{
+-    void *p;
+-    size *= n;
+-    if (size == 0) size = 1;
+-    p = DWC_ALLOC(size);
+-    return p;
+-}
+-
+-#define snewn(n, type) ((type *)snmalloc((n), sizeof(type)))
+-#define sfree DWC_FREE
+-
+-/*
+- * Usage notes:
+- *  * Do not call the DIVMOD_WORD macro with expressions such as array
+- *    subscripts, as some implementations object to this (see below).
+- *  * Note that none of the division methods below will cope if the
+- *    quotient won't fit into BIGNUM_INT_BITS. Callers should be careful
+- *    to avoid this case.
+- *    If this condition occurs, in the case of the x86 DIV instruction,
+- *    an overflow exception will occur, which (according to a correspondent)
+- *    will manifest on Windows as something like
+- *      0xC0000095: Integer overflow
+- *    The C variant won't give the right answer, either.
+- */
+-
+-#define MUL_WORD(w1, w2) ((BignumDblInt)w1 * w2)
+-
+-#if defined __GNUC__ && defined __i386__
+-#define DIVMOD_WORD(q, r, hi, lo, w) \
+-    __asm__("div %2" : \
+-	    "=d" (r), "=a" (q) : \
+-	    "r" (w), "d" (hi), "a" (lo))
+-#else
+-#define DIVMOD_WORD(q, r, hi, lo, w) do { \
+-    BignumDblInt n = (((BignumDblInt)hi) << BIGNUM_INT_BITS) | lo; \
+-    q = n / w; \
+-    r = n % w; \
+-} while (0)
+-#endif
+-
+-//    q = n / w;                                
+-//    r = n % w;                                
+-
+-#define BIGNUM_INT_BYTES (BIGNUM_INT_BITS / 8)
+-
+-#define BIGNUM_INTERNAL
+-
+-static Bignum newbn(int length)
+-{
+-    Bignum b = snewn(length + 1, BignumInt);
+-    //if (!b)
+-    //abort();		       /* FIXME */
+-    DWC_MEMSET(b, 0, (length + 1) * sizeof(*b));
+-    b[0] = length;
+-    return b;
+-}
+-
+-void freebn(Bignum b)
+-{
+-    /*
+-     * Burn the evidence, just in case.
+-     */
+-    DWC_MEMSET(b, 0, sizeof(b[0]) * (b[0] + 1));
+-    sfree(b);
+-}
+-
+-/*
+- * Compute c = a * b.
+- * Input is in the first len words of a and b.
+- * Result is returned in the first 2*len words of c.
+- */
+-static void internal_mul(BignumInt *a, BignumInt *b,
+-			 BignumInt *c, int len)
+-{
+-    int i, j;
+-    BignumDblInt t;
+-
+-    for (j = 0; j < 2 * len; j++)
+-	c[j] = 0;
+-
+-    for (i = len - 1; i >= 0; i--) {
+-	t = 0;
+-	for (j = len - 1; j >= 0; j--) {
+-	    t += MUL_WORD(a[i], (BignumDblInt) b[j]);
+-	    t += (BignumDblInt) c[i + j + 1];
+-	    c[i + j + 1] = (BignumInt) t;
+-	    t = t >> BIGNUM_INT_BITS;
+-	}
+-	c[i] = (BignumInt) t;
+-    }
+-}
+-
+-static void internal_add_shifted(BignumInt *number,
+-				 unsigned n, int shift)
+-{
+-    int word = 1 + (shift / BIGNUM_INT_BITS);
+-    int bshift = shift % BIGNUM_INT_BITS;
+-    BignumDblInt addend;
+-
+-    addend = (BignumDblInt)n << bshift;
+-
+-    while (addend) {
+-	addend += number[word];
+-	number[word] = (BignumInt) addend & BIGNUM_INT_MASK;
+-	addend >>= BIGNUM_INT_BITS;
+-	word++;
+-    }
+-}
+-
+-/*
+- * Compute a = a % m.
+- * Input in first alen words of a and first mlen words of m.
+- * Output in first alen words of a
+- * (of which first alen-mlen words will be zero).
+- * The MSW of m MUST have its high bit set.
+- * Quotient is accumulated in the `quotient' array, which is a Bignum
+- * rather than the internal bigendian format. Quotient parts are shifted
+- * left by `qshift' before adding into quot.
+- */
+-static void internal_mod(BignumInt *a, int alen,
+-			 BignumInt *m, int mlen,
+-			 BignumInt *quot, int qshift)
+-{
+-    BignumInt m0, m1;
+-    unsigned int h;
+-    int i, k;
+-
+-    m0 = m[0];
+-    if (mlen > 1)
+-	m1 = m[1];
+-    else
+-	m1 = 0;
+-
+-    for (i = 0; i <= alen - mlen; i++) {
+-	BignumDblInt t;
+-	unsigned int q, r, c, ai1;
+-
+-	if (i == 0) {
+-	    h = 0;
+-	} else {
+-	    h = a[i - 1];
+-	    a[i - 1] = 0;
+-	}
+-
+-	if (i == alen - 1)
+-	    ai1 = 0;
+-	else
+-	    ai1 = a[i + 1];
+-
+-	/* Find q = h:a[i] / m0 */
+-	if (h >= m0) {
+-	    /*
+-	     * Special case.
+-	     * 
+-	     * To illustrate it, suppose a BignumInt is 8 bits, and
+-	     * we are dividing (say) A1:23:45:67 by A1:B2:C3. Then
+-	     * our initial division will be 0xA123 / 0xA1, which
+-	     * will give a quotient of 0x100 and a divide overflow.
+-	     * However, the invariants in this division algorithm
+-	     * are not violated, since the full number A1:23:... is
+-	     * _less_ than the quotient prefix A1:B2:... and so the
+-	     * following correction loop would have sorted it out.
+-	     * 
+-	     * In this situation we set q to be the largest
+-	     * quotient we _can_ stomach (0xFF, of course).
+-	     */
+-	    q = BIGNUM_INT_MASK;
+-	} else {
+-	    /* Macro doesn't want an array subscript expression passed
+-	     * into it (see definition), so use a temporary. */
+-	    BignumInt tmplo = a[i];
+-	    DIVMOD_WORD(q, r, h, tmplo, m0);
+-
+-	    /* Refine our estimate of q by looking at
+-	     h:a[i]:a[i+1] / m0:m1 */
+-	    t = MUL_WORD(m1, q);
+-	    if (t > ((BignumDblInt) r << BIGNUM_INT_BITS) + ai1) {
+-		q--;
+-		t -= m1;
+-		r = (r + m0) & BIGNUM_INT_MASK;     /* overflow? */
+-		if (r >= (BignumDblInt) m0 &&
+-		    t > ((BignumDblInt) r << BIGNUM_INT_BITS) + ai1) q--;
+-	    }
+-	}
+-
+-	/* Subtract q * m from a[i...] */
+-	c = 0;
+-	for (k = mlen - 1; k >= 0; k--) {
+-	    t = MUL_WORD(q, m[k]);
+-	    t += c;
+-	    c = (unsigned)(t >> BIGNUM_INT_BITS);
+-	    if ((BignumInt) t > a[i + k])
+-		c++;
+-	    a[i + k] -= (BignumInt) t;
+-	}
+-
+-	/* Add back m in case of borrow */
+-	if (c != h) {
+-	    t = 0;
+-	    for (k = mlen - 1; k >= 0; k--) {
+-		t += m[k];
+-		t += a[i + k];
+-		a[i + k] = (BignumInt) t;
+-		t = t >> BIGNUM_INT_BITS;
+-	    }
+-	    q--;
+-	}
+-	if (quot)
+-	    internal_add_shifted(quot, q, qshift + BIGNUM_INT_BITS * (alen - mlen - i));
+-    }
+-}
+-
+-/*
+- * Compute p % mod.
+- * The most significant word of mod MUST be non-zero.
+- * We assume that the result array is the same size as the mod array.
+- * We optionally write out a quotient if `quotient' is non-NULL.
+- * We can avoid writing out the result if `result' is NULL.
+- */
+-void bigdivmod(Bignum p, Bignum mod, Bignum result, Bignum quotient)
+-{
+-    BignumInt *n, *m;
+-    int mshift;
+-    int plen, mlen, i, j;
+-
+-    /* Allocate m of size mlen, copy mod to m */
+-    /* We use big endian internally */
+-    mlen = mod[0];
+-    m = snewn(mlen, BignumInt);
+-    for (j = 0; j < mlen; j++)
+-	m[j] = mod[mod[0] - j];
+-
+-    /* Shift m left to make msb bit set */
+-    for (mshift = 0; mshift < BIGNUM_INT_BITS-1; mshift++)
+-	if ((m[0] << mshift) & BIGNUM_TOP_BIT)
+-	    break;
+-    if (mshift) {
+-	for (i = 0; i < mlen - 1; i++)
+-	    m[i] = (m[i] << mshift) | (m[i + 1] >> (BIGNUM_INT_BITS - mshift));
+-	m[mlen - 1] = m[mlen - 1] << mshift;
+-    }
+-
+-    plen = p[0];
+-    /* Ensure plen > mlen */
+-    if (plen <= mlen)
+-	plen = mlen + 1;
+-
+-    /* Allocate n of size plen, copy p to n */
+-    n = snewn(plen, BignumInt);
+-    for (j = 0; j < plen; j++)
+-	n[j] = 0;
+-    for (j = 1; j <= (int)p[0]; j++)
+-	n[plen - j] = p[j];
+-
+-    /* Main computation */
+-    internal_mod(n, plen, m, mlen, quotient, mshift);
+-
+-    /* Fixup result in case the modulus was shifted */
+-    if (mshift) {
+-	for (i = plen - mlen - 1; i < plen - 1; i++)
+-	    n[i] = (n[i] << mshift) | (n[i + 1] >> (BIGNUM_INT_BITS - mshift));
+-	n[plen - 1] = n[plen - 1] << mshift;
+-	internal_mod(n, plen, m, mlen, quotient, 0);
+-	for (i = plen - 1; i >= plen - mlen; i--)
+-	    n[i] = (n[i] >> mshift) | (n[i - 1] << (BIGNUM_INT_BITS - mshift));
+-    }
+-
+-    /* Copy result to buffer */
+-    if (result) {
+-	for (i = 1; i <= (int)result[0]; i++) {
+-	    int j = plen - i;
+-	    result[i] = j >= 0 ? n[j] : 0;
+-	}
+-    }
+-
+-    /* Free temporary arrays */
+-    for (i = 0; i < mlen; i++)
+-	m[i] = 0;
+-    sfree(m);
+-    for (i = 0; i < plen; i++)
+-	n[i] = 0;
+-    sfree(n);
+-}
+-
+-/*
+- * Simple remainder.
+- */
+-Bignum bigmod(Bignum a, Bignum b)
+-{
+-    Bignum r = newbn(b[0]);
+-    bigdivmod(a, b, r, NULL);
+-    return r;
+-}
+-
+-/*
+- * Compute (base ^ exp) % mod.
+- */
+-Bignum dwc_modpow(Bignum base_in, Bignum exp, Bignum mod)
+-{
+-    BignumInt *a, *b, *n, *m;
+-    int mshift;
+-    int mlen, i, j;
+-    Bignum base, result;
+-
+-    /*
+-     * The most significant word of mod needs to be non-zero. It
+-     * should already be, but let's make sure.
+-     */
+-    //assert(mod[mod[0]] != 0);
+-
+-    /*
+-     * Make sure the base is smaller than the modulus, by reducing
+-     * it modulo the modulus if not.
+-     */
+-    base = bigmod(base_in, mod);
+-
+-    /* Allocate m of size mlen, copy mod to m */
+-    /* We use big endian internally */
+-    mlen = mod[0];
+-    m = snewn(mlen, BignumInt);
+-    for (j = 0; j < mlen; j++)
+-	m[j] = mod[mod[0] - j];
+-
+-    /* Shift m left to make msb bit set */
+-    for (mshift = 0; mshift < BIGNUM_INT_BITS - 1; mshift++)
+-	if ((m[0] << mshift) & BIGNUM_TOP_BIT)
+-	    break;
+-    if (mshift) {
+-	for (i = 0; i < mlen - 1; i++)
+-	    m[i] =
+-		(m[i] << mshift) | (m[i + 1] >>
+-				    (BIGNUM_INT_BITS - mshift));
+-	m[mlen - 1] = m[mlen - 1] << mshift;
+-    }
+-
+-    /* Allocate n of size mlen, copy base to n */
+-    n = snewn(mlen, BignumInt);
+-    i = mlen - base[0];
+-    for (j = 0; j < i; j++)
+-	n[j] = 0;
+-    for (j = 0; j < base[0]; j++)
+-	n[i + j] = base[base[0] - j];
+-
+-    /* Allocate a and b of size 2*mlen. Set a = 1 */
+-    a = snewn(2 * mlen, BignumInt);
+-    b = snewn(2 * mlen, BignumInt);
+-    for (i = 0; i < 2 * mlen; i++)
+-	a[i] = 0;
+-    a[2 * mlen - 1] = 1;
+-
+-    /* Skip leading zero bits of exp. */
+-    i = 0;
+-    j = BIGNUM_INT_BITS - 1;
+-    while (i < exp[0] && (exp[exp[0] - i] & (1 << j)) == 0) {
+-	j--;
+-	if (j < 0) {
+-	    i++;
+-	    j = BIGNUM_INT_BITS - 1;
+-	}
+-    }
+-
+-    /* Main computation */
+-    while (i < exp[0]) {
+-	while (j >= 0) {
+-	    internal_mul(a + mlen, a + mlen, b, mlen);
+-	    internal_mod(b, mlen * 2, m, mlen, NULL, 0);
+-	    if ((exp[exp[0] - i] & (1 << j)) != 0) {
+-		internal_mul(b + mlen, n, a, mlen);
+-		internal_mod(a, mlen * 2, m, mlen, NULL, 0);
+-	    } else {
+-		BignumInt *t;
+-		t = a;
+-		a = b;
+-		b = t;
+-	    }
+-	    j--;
+-	}
+-	i++;
+-	j = BIGNUM_INT_BITS - 1;
+-    }
+-
+-    /* Fixup result in case the modulus was shifted */
+-    if (mshift) {
+-	for (i = mlen - 1; i < 2 * mlen - 1; i++)
+-	    a[i] =
+-		(a[i] << mshift) | (a[i + 1] >>
+-				    (BIGNUM_INT_BITS - mshift));
+-	a[2 * mlen - 1] = a[2 * mlen - 1] << mshift;
+-	internal_mod(a, mlen * 2, m, mlen, NULL, 0);
+-	for (i = 2 * mlen - 1; i >= mlen; i--)
+-	    a[i] =
+-		(a[i] >> mshift) | (a[i - 1] <<
+-				    (BIGNUM_INT_BITS - mshift));
+-    }
+-
+-    /* Copy result to buffer */
+-    result = newbn(mod[0]);
+-    for (i = 0; i < mlen; i++)
+-	result[result[0] - i] = a[i + mlen];
+-    while (result[0] > 1 && result[result[0]] == 0)
+-	result[0]--;
+-
+-    /* Free temporary arrays */
+-    for (i = 0; i < 2 * mlen; i++)
+-	a[i] = 0;
+-    sfree(a);
+-    for (i = 0; i < 2 * mlen; i++)
+-	b[i] = 0;
+-    sfree(b);
+-    for (i = 0; i < mlen; i++)
+-	m[i] = 0;
+-    sfree(m);
+-    for (i = 0; i < mlen; i++)
+-	n[i] = 0;
+-    sfree(n);
+-
+-    freebn(base);
+-
+-    return result;
+-}
+-
+-
+-#ifdef UNITTEST
+-
+-static __u32 dh_p[] = {
+-	96,
+-	0xFFFFFFFF,
+-	0xFFFFFFFF,
+-	0xA93AD2CA,
+-	0x4B82D120,
+-	0xE0FD108E,
+-	0x43DB5BFC,
+-	0x74E5AB31,
+-	0x08E24FA0,
+-	0xBAD946E2,
+-	0x770988C0,
+-	0x7A615D6C,
+-	0xBBE11757,
+-	0x177B200C,
+-	0x521F2B18,
+-	0x3EC86A64,
+-	0xD8760273,
+-	0xD98A0864,
+-	0xF12FFA06,
+-	0x1AD2EE6B,
+-	0xCEE3D226,
+-	0x4A25619D,
+-	0x1E8C94E0,
+-	0xDB0933D7,
+-	0xABF5AE8C,
+-	0xA6E1E4C7,
+-	0xB3970F85,
+-	0x5D060C7D,
+-	0x8AEA7157,
+-	0x58DBEF0A,
+-	0xECFB8504,
+-	0xDF1CBA64,
+-	0xA85521AB,
+-	0x04507A33,
+-	0xAD33170D,
+-	0x8AAAC42D,
+-	0x15728E5A,
+-	0x98FA0510,
+-	0x15D22618,
+-	0xEA956AE5,
+-	0x3995497C,
+-	0x95581718,
+-	0xDE2BCBF6,
+-	0x6F4C52C9,
+-	0xB5C55DF0,
+-	0xEC07A28F,
+-	0x9B2783A2,
+-	0x180E8603,
+-	0xE39E772C,
+-	0x2E36CE3B,
+-	0x32905E46,
+-	0xCA18217C,
+-	0xF1746C08,
+-	0x4ABC9804,
+-	0x670C354E,
+-	0x7096966D,
+-	0x9ED52907,
+-	0x208552BB,
+-	0x1C62F356,
+-	0xDCA3AD96,
+-	0x83655D23,
+-	0xFD24CF5F,
+-	0x69163FA8,
+-	0x1C55D39A,
+-	0x98DA4836,
+-	0xA163BF05,
+-	0xC2007CB8,
+-	0xECE45B3D,
+-	0x49286651,
+-	0x7C4B1FE6,
+-	0xAE9F2411,
+-	0x5A899FA5,
+-	0xEE386BFB,
+-	0xF406B7ED,
+-	0x0BFF5CB6,
+-	0xA637ED6B,
+-	0xF44C42E9,
+-	0x625E7EC6,
+-	0xE485B576,
+-	0x6D51C245,
+-	0x4FE1356D,
+-	0xF25F1437,
+-	0x302B0A6D,
+-	0xCD3A431B,
+-	0xEF9519B3,
+-	0x8E3404DD,
+-	0x514A0879,
+-	0x3B139B22,
+-	0x020BBEA6,
+-	0x8A67CC74,
+-	0x29024E08,
+-	0x80DC1CD1,
+-	0xC4C6628B,
+-	0x2168C234,
+-	0xC90FDAA2,
+-	0xFFFFFFFF,
+-	0xFFFFFFFF,
+-};
+-
+-static __u32 dh_a[] = {
+-	8,
+-	0xdf367516,
+-	0x86459caa,
+-	0xe2d459a4,
+-	0xd910dae0,
+-	0x8a8b5e37,
+-	0x67ab31c6,
+-	0xf0b55ea9,
+-	0x440051d6,
+-};
+-
+-static __u32 dh_b[] = {
+-	8,
+-	0xded92656,
+-	0xe07a048a,
+-	0x6fa452cd,
+-	0x2df89d30,
+-	0xc75f1b0f,
+-	0x8ce3578f, 
+-	0x7980a324,
+-	0x5daec786,
+-};
+-
+-static __u32 dh_g[] = {
+-	1,
+-	2,
+-};
+-
+-int main(void)
+-{
+-	int i;
+-	__u32 *k;
+-	k = modpow(dh_g, dh_a, dh_p);
+-
+-	printf("\n\n");
+-	for (i=0; i<k[0]; i++) {
+-		__u32 word32 = k[k[0] - i];
+-		__u16 l = word32 & 0xffff;
+-		__u16 m = (word32 & 0xffff0000) >> 16;
+-		printf("%04x %04x ", m, l);
+-		if (!((i + 1)%13)) printf("\n");
+-	}
+-	printf("\n\n");
+-
+-	if ((k[0] == 0x60) && (k[1] == 0x28e490e5) && (k[0x60] == 0x5a0d3d4e)) {
+-		printf("PASS\n\n");
+-	}
+-	else {
+-		printf("FAIL\n\n");
+-	}
+-
+-}
+-
+-#endif /* UNITTEST */
+-
+-#endif /* CONFIG_MACH_IPMATE */
+diff --git a/drivers/usb/host/dwc_common_port/dwc_modpow.h b/drivers/usb/host/dwc_common_port/dwc_modpow.h
+deleted file mode 100644
+index 980f9f1..0000000
+--- a/drivers/usb/host/dwc_common_port/dwc_modpow.h
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- * dwc_modpow.h
+- * See dwc_modpow.c for license and changes
+- */
+-#ifndef _DWC_MODPOW_H
+-#define _DWC_MODPOW_H
+-
+-#include "dwc_os.h"
+-
+-/** @file
+- *
+- * This file defines the module exponentiation function which is only used
+- * internally by the DWC UWB modules for calculation of PKs during numeric
+- * association.  The routine is taken from the PUTTY, an open source terminal
+- * emulator.  The PUTTY License is preserved in the dwc_modpow.c file.
+- *
+- */
+-
+-typedef uint32_t BignumInt;
+-typedef uint64_t BignumDblInt;
+-typedef BignumInt *Bignum;
+-
+-/* Compute modular exponentiaion */
+-extern Bignum dwc_modpow(Bignum base_in, Bignum exp, Bignum mod);
+-
+-#endif /* _LINUX_BIGNUM_H */

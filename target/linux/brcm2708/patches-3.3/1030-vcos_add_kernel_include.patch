@@ -1,0 +1,18 @@
+From 7a681f9eb4fa7484956ea347e2c35f12d151aba4 Mon Sep 17 00:00:00 2001
+From: Chris Boot <bootc@bootc.net>
+Date: Tue, 8 May 2012 14:50:35 +0100
+Subject: [PATCH] vcos: add linux/kernel.h include
+
+
+diff --git a/drivers/misc/vc04_services/interface/vcos/linuxkernel/vcos_platform_types.h b/drivers/misc/vc04_services/interface/vcos/linuxkernel/vcos_platform_types.h
+index f841e12..5f82aaf 100644
+--- a/drivers/misc/vc04_services/interface/vcos/linuxkernel/vcos_platform_types.h
++++ b/drivers/misc/vc04_services/interface/vcos/linuxkernel/vcos_platform_types.h
+@@ -26,6 +26,7 @@ VideoCore OS Abstraction Layer - platform-specific types and defines
+ #include <stddef.h>
+ #include <linux/types.h>
+ #include <linux/bug.h>
++#include <linux/kernel.h>
+ 
+ #define VCOSPRE_ extern
+ #define VCOSPOST_
