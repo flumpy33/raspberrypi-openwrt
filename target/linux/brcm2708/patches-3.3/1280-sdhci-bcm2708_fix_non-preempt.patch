@@ -1,0 +1,112 @@
+From 307d9fbb18900c17bc9deeb4020c5ed599053947 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Tue, 28 Aug 2012 17:40:49 +0100
+Subject: [PATCH] Fix build for non-preempt case. Fix warning
+
+
+Index: linux-3.3.8/drivers/mmc/host/sdhci-bcm2708.c
+===================================================================
+--- linux-3.3.8.orig/drivers/mmc/host/sdhci-bcm2708.c	2012-09-19 11:30:10.300754818 +0200
++++ linux-3.3.8/drivers/mmc/host/sdhci-bcm2708.c	2012-09-19 11:35:08.414233073 +0200
+@@ -653,7 +653,7 @@
+ sdhci_bcm2708_platdma_reset(struct sdhci_host *host, struct mmc_data *data)
+ {
+ 	struct sdhci_bcm2708_priv *host_priv = SDHCI_HOST_PRIV(host);
+-	unsigned long flags;
++//	unsigned long flags;
+ 
+ 	BUG_ON(NULL == host);
+ 
+@@ -750,7 +750,7 @@
+ 	int sg_len;
+ 	int sg_ix;
+ 	int sg_todo;
+-	unsigned long flags;
++//	unsigned long flags;
+ 
+ 	BUG_ON(NULL == host);
+ 
+Index: linux-3.3.8/drivers/mmc/host/sdhci.c
+===================================================================
+--- linux-3.3.8.orig/drivers/mmc/host/sdhci.c	2012-09-19 11:33:54.065864396 +0200
++++ linux-3.3.8/drivers/mmc/host/sdhci.c	2012-09-19 11:35:08.414233073 +0200
+@@ -127,6 +127,7 @@
+ void sdhci_spin_lock(struct sdhci_host *host)
+ {
+ 	spin_lock(&host->lock);
++#ifdef CONFIG_PREEMPT
+ 	if(enable_llm)
+ 	{
+ 		disable_irq_nosync(host->irq);
+@@ -134,10 +135,12 @@
+ 			disable_irq_nosync(host->second_irq);
+ 		local_irq_enable();
+ 	}
++#endif
+ }
+ 
+ void sdhci_spin_unlock(struct sdhci_host *host)
+ {
++#ifdef CONFIG_PREEMPT
+ 	if(enable_llm)
+ 	{
+ 		local_irq_disable();
+@@ -145,11 +148,13 @@
+ 		if(host->second_irq)
+ 			enable_irq(host->second_irq);
+ 	}
++#endif
+ 	spin_unlock(&host->lock);
+ }
+ 
+ void sdhci_spin_lock_irqsave(struct sdhci_host *host,unsigned long *flags)
+ {
++#ifdef CONFIG_PREEMPT
+ 	if(enable_llm)
+ 	{
+ 		while(sdhci_locked)
+@@ -163,11 +168,13 @@
+ 		local_irq_enable();
+ 	}
+ 	else
++#endif
+ 		spin_lock_irqsave(&host->lock,*flags);
+ }
+ 
+ void sdhci_spin_unlock_irqrestore(struct sdhci_host *host,unsigned long flags)
+ {
++#ifdef CONFIG_PREEMPT
+ 	if(enable_llm)
+ 	{
+ 		local_irq_disable();
+@@ -175,25 +182,30 @@
+ 		if(host->second_irq)
+ 			enable_irq(host->second_irq);
+ 	}
++#endif
+ 	spin_unlock_irqrestore(&host->lock,flags);
+ }
+ 
+ static void sdhci_spin_enable_schedule(struct sdhci_host *host)
+ {
++#ifdef CONFIG_PREEMPT
+ 	if(enable_llm)
+ 	{
+ 		sdhci_locked = 1;
+ 		preempt_enable();
+ 	}
++#endif
+ }
+ 
+ static void sdhci_spin_disable_schedule(struct sdhci_host *host)
+ {
++#ifdef CONFIG_PREEMPT
+ 	if(enable_llm)
+ 	{
+ 		preempt_disable();
+ 		sdhci_locked = 0;
+ 	}
++#endif
+ }
+ 
+ static void sdhci_clear_set_irqs(struct sdhci_host *host, u32 clear, u32 set)

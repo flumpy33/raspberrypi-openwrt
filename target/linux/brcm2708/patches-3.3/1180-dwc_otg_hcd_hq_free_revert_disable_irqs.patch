@@ -1,0 +1,33 @@
+From e5c8bb0e76069d9afefcc9d96d8faca384cc67d2 Mon Sep 17 00:00:00 2001
+From: ddv2005 <ddv@abinet.com>
+Date: Mon, 20 Aug 2012 10:48:38 -0400
+Subject: [PATCH] Revert "Disable IRQs in dwc_otg_hcd_qh_free" because
+ DWC_DMA_FREE should be called with enabled IRQs.
+
+
+diff --git a/drivers/usb/host/dwc_otg/dwc_otg_hcd_queue.c b/drivers/usb/host/dwc_otg/dwc_otg_hcd_queue.c
+index 4791033..08c1669 100755
+--- a/drivers/usb/host/dwc_otg/dwc_otg_hcd_queue.c
++++ b/drivers/usb/host/dwc_otg/dwc_otg_hcd_queue.c
+@@ -54,11 +54,10 @@ extern bool microframe_schedule;
+  */
+ void dwc_otg_hcd_qh_free(dwc_otg_hcd_t * hcd, dwc_otg_qh_t * qh)
+ {
+-	dwc_irqflags_t flags;
+ 	dwc_otg_qtd_t *qtd, *qtd_tmp;
+ 
+ 	/* Free each QTD in the QTD list */
+-	DWC_SPINLOCK_IRQSAVE(hcd->lock,&flags);
++	DWC_SPINLOCK(hcd->lock);
+ 	DWC_CIRCLEQ_FOREACH_SAFE(qtd, qtd_tmp, &qh->qtd_list, qtd_list_entry) {
+ 		DWC_CIRCLEQ_REMOVE(&qh->qtd_list, qtd, qtd_list_entry);
+ 		dwc_otg_hcd_qtd_free(qtd);
+@@ -77,7 +76,7 @@ void dwc_otg_hcd_qh_free(dwc_otg_hcd_t * hcd, dwc_otg_qh_t * qh)
+ 	}
+ 
+ 	DWC_FREE(qh);
+-	DWC_SPINUNLOCK_IRQRESTORE(hcd->lock,flags);
++	DWC_SPINUNLOCK(hcd->lock);
+ 	return;
+ }
+ 
