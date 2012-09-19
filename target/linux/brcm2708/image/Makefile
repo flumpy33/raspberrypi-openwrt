@@ -41,6 +41,7 @@ define Image/Build
 	$(call Image/Build/RaspberryPi,$(1),128)
 	$(call Image/Build/RaspberryPi,$(1),192)
 	$(call Image/Build/RaspberryPi,$(1),224)
+	$(call Image/Build/RaspberryPi,$(1),240)
 endef
 
 $(eval $(call BuildImage))
