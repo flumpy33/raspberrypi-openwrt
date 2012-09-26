@@ -1,0 +1,188 @@
+From d8a00ed27f71d12d5ba02d18f53c8834e5b2b319 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Mon, 17 Sep 2012 18:17:56 +0100
+Subject: [PATCH] Remove some unnecessary dmesg output.
+
+
+diff --git a/drivers/cpufreq/bcm2835-cpufreq.c b/drivers/cpufreq/bcm2835-cpufreq.c
+index aa6fc66..6ff1edb 100755
+--- a/drivers/cpufreq/bcm2835-cpufreq.c
++++ b/drivers/cpufreq/bcm2835-cpufreq.c
+@@ -196,7 +196,7 @@ static int bcm2835_cpufreq_driver_target(struct cpufreq_policy *policy, unsigned
+ 		policy->cur = bcm2835_cpufreq_get_clock(VCMSG_GET_CLOCK_RATE);
+ 		return -EINVAL;
+ 	}
+-	print_info("Freq %d->%d (min=%d max=%d target=%d request=%d)", cur, policy->cur, policy->min, policy->max, target_freq, target);
++	print_debug("Freq %d->%d (min=%d max=%d target=%d request=%d)", cur, policy->cur, policy->min, policy->max, target_freq, target);
+ 	return 0;
+ }
+ 
+diff --git a/drivers/video/bcm2708_fb.c b/drivers/video/bcm2708_fb.c
+index 5ca8aca..efdee9d 100644
+--- a/drivers/video/bcm2708_fb.c
++++ b/drivers/video/bcm2708_fb.c
+@@ -36,6 +36,12 @@
+ #include <linux/io.h>
+ #include <linux/dma-mapping.h>
+ 
++#ifdef BCM2708_FB_DEBUG
++#define print_debug(fmt,...) pr_debug("%s:%s:%d: "fmt, MODULE_NAME, __func__, __LINE__, ##__VA_ARGS__)
++#else
++#define print_debug(fmt,...)
++#endif
++
+ /* This is limited to 16 characters when displayed by X startup */
+ static const char *bcm2708_name = "BCM2708 FB";
+ 
+@@ -135,17 +141,15 @@ static int bcm2708_fb_check_var(struct fb_var_screeninfo *var,
+ {
+ 	/* info input, var output */
+ 	int yres;
+-	/* memory size in pixels */
+-	unsigned pixels = info->screen_size * 8 / var->bits_per_pixel;
+ 
+ 	/* info input, var output */
+-	pr_info("bcm2708_fb_check_var info(%p) %dx%d (%dx%d), %d, %d\n", info,
++	print_debug("bcm2708_fb_check_var info(%p) %dx%d (%dx%d), %d, %d\n", info,
+ 		info->var.xres, info->var.yres, info->var.xres_virtual,
+ 		info->var.yres_virtual, (int)info->screen_size,
+ 		info->var.bits_per_pixel);
+-	pr_info("bcm2708_fb_check_var var(%p) %dx%d (%dx%d), %d, %d\n", var,
++	print_debug("bcm2708_fb_check_var var(%p) %dx%d (%dx%d), %d\n", var,
+ 		var->xres, var->yres, var->xres_virtual, var->yres_virtual,
+-		var->bits_per_pixel, pixels);
++		var->bits_per_pixel);
+ 
+ 	if (!var->bits_per_pixel)
+ 		var->bits_per_pixel = 16;
+@@ -211,7 +215,7 @@ static int bcm2708_fb_set_par(struct fb_info *info)
+ 	fbinfo->base = 0;	/* filled in by VC */
+ 	fbinfo->pitch = 0;	/* filled in by VC */
+ 
+-	pr_info("bcm2708_fb_set_par info(%p) %dx%d (%dx%d), %d, %d\n", info,
++	print_debug("bcm2708_fb_set_par info(%p) %dx%d (%dx%d), %d, %d\n", info,
+ 		info->var.xres, info->var.yres, info->var.xres_virtual,
+ 		info->var.yres_virtual, (int)info->screen_size,
+ 		info->var.bits_per_pixel);
+@@ -251,7 +255,7 @@ static int bcm2708_fb_set_par(struct fb_info *info)
+ 			BUG();		/* what can we do here */
+ 		}
+ 	}
+-	pr_info
++	print_debug
+ 	    ("BCM2708FB: start = %p,%p width=%d, height=%d, bpp=%d, pitch=%d size=%d success=%d\n",
+ 	     (void *)fb->fb.screen_base, (void *)fb->fb.fix.smem_start,
+ 	     fbinfo->xres, fbinfo->yres, fbinfo->bpp,
+@@ -274,7 +278,7 @@ static int bcm2708_fb_setcolreg(unsigned int regno, unsigned int red,
+ {
+ 	struct bcm2708_fb *fb = to_bcm2708(info);
+ 
+-	/*pr_info("BCM2708FB: setcolreg %d:(%02x,%02x,%02x,%02x) %x\n", regno, red, green, blue, transp, fb->fb.fix.visual);*/
++	/*print_debug("BCM2708FB: setcolreg %d:(%02x,%02x,%02x,%02x) %x\n", regno, red, green, blue, transp, fb->fb.fix.visual);*/
+ 	if (fb->fb.var.bits_per_pixel <= 8) {
+ 		if (regno < 256) {
+ 			/* blue [0:4], green [5:10], red [11:15] */
+@@ -297,28 +301,28 @@ static int bcm2708_fb_setcolreg(unsigned int regno, unsigned int red,
+ 
+ static int bcm2708_fb_blank(int blank_mode, struct fb_info *info)
+ {
+-	/*pr_info("bcm2708_fb_blank\n"); */
++	/*print_debug("bcm2708_fb_blank\n"); */
+ 	return -1;
+ }
+ 
+ static void bcm2708_fb_fillrect(struct fb_info *info,
+ 				const struct fb_fillrect *rect)
+ {
+-	/* (is called) pr_info("bcm2708_fb_fillrect\n"); */
++	/* (is called) print_debug("bcm2708_fb_fillrect\n"); */
+ 	cfb_fillrect(info, rect);
+ }
+ 
+ static void bcm2708_fb_copyarea(struct fb_info *info,
+ 				const struct fb_copyarea *region)
+ {
+-	/*pr_info("bcm2708_fb_copyarea\n"); */
++	/*print_debug("bcm2708_fb_copyarea\n"); */
+ 	cfb_copyarea(info, region);
+ }
+ 
+ static void bcm2708_fb_imageblit(struct fb_info *info,
+ 				 const struct fb_image *image)
+ {
+-	/* (is called) pr_info("bcm2708_fb_imageblit\n"); */
++	/* (is called) print_debug("bcm2708_fb_imageblit\n"); */
+ 	cfb_imageblit(info, image);
+ }
+ 
+@@ -393,15 +397,15 @@ static int bcm2708_fb_register(struct bcm2708_fb *fb)
+ 
+ 	fb_set_var(&fb->fb, &fb->fb.var);
+ 
+-	pr_info("BCM2708FB: registering framebuffer (%dx%d@%d)\n", fbwidth,
++	print_debug("BCM2708FB: registering framebuffer (%dx%d@%d)\n", fbwidth,
+ 		fbheight, fbdepth);
+ 
+ 	ret = register_framebuffer(&fb->fb);
+-	pr_info("BCM2708FB: register framebuffer (%d)\n", ret);
++	print_debug("BCM2708FB: register framebuffer (%d)\n", ret);
+ 	if (ret == 0)
+ 		goto out;
+ 
+-	pr_info("BCM2708FB: cannot register framebuffer (%d)\n", ret);
++	print_debug("BCM2708FB: cannot register framebuffer (%d)\n", ret);
+ out:
+ 	return ret;
+ }
+diff --git a/sound/arm/bcm2835-pcm.c b/sound/arm/bcm2835-pcm.c
+index bc146a2..2f63ac6 100755
+--- a/sound/arm/bcm2835-pcm.c
++++ b/sound/arm/bcm2835-pcm.c
+@@ -98,7 +98,7 @@ static int snd_bcm2835_playback_open(struct snd_pcm_substream *substream)
+ 
+ 	audio_info(" .. IN (%d)\n", substream->number);
+ 
+-	audio_warning("Alsa open (%d)\n", substream->number);
++	audio_info("Alsa open (%d)\n", substream->number);
+ 	idx = substream->number;
+ 
+ 	if (idx > MAX_SUBSTREAMS) {
+@@ -167,7 +167,7 @@ static int snd_bcm2835_playback_close(struct snd_pcm_substream *substream)
+ 	bcm2835_alsa_stream_t *alsa_stream = runtime->private_data;
+ 
+ 	audio_info(" .. IN\n");
+-	audio_warning("Alsa close\n");
++	audio_info("Alsa close\n");
+ 
+ 	/*
+ 	 * Call stop if it's still running. This happens when app
+diff --git a/sound/arm/bcm2835.c b/sound/arm/bcm2835.c
+index 44bedb5..9546fe6 100755
+--- a/sound/arm/bcm2835.c
++++ b/sound/arm/bcm2835.c
+@@ -87,8 +87,6 @@ static int __devinit snd_bcm2835_alsa_probe(struct platform_device *pdev)
+ 	bcm2835_chip_t *chip;
+ 	struct snd_card *card;
+ 	int err;
+-	printk(KERN_INFO "Probing FOR bcm2835 ALSA device (%d):(%d)\n",
+-	     dev, enable[dev]);
+ 
+ 	if (dev >= MAX_SUBSTREAMS)
+ 		return -ENODEV;
+@@ -101,7 +99,6 @@ static int __devinit snd_bcm2835_alsa_probe(struct platform_device *pdev)
+ 	if (dev > 0)
+ 		goto add_register_map;
+ 
+-	printk("Creating card...\n");
+ 	err = snd_card_create(index[dev], id[dev], THIS_MODULE, 0, &g_card);
+ 	if (err < 0)
+ 		goto out;
+@@ -374,8 +371,6 @@ static int __devinit bcm2835_alsa_device_init(void)
+ 		printk("Error registering bcm2835_alsa7_driver %d .\n", err);
+ 		goto unregister_6;
+ 	}
+-	printk(KERN_INFO "BCM2835 ALSA driver init %s\n",
+-	       err ? "FAILED" : "OK");
+ 
+ 	return 0;
+ 

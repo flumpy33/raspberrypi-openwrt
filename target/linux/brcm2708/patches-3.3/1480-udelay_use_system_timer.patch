@@ -1,0 +1,47 @@
+From c14ddd05972ac5aa822a9e9f487cf2c4a1b958a0 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Mon, 24 Sep 2012 23:40:21 +0100
+Subject: [PATCH] Use system timer for udelay, so unaffected by cpufreq
+
+
+Index: linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c
+===================================================================
+--- linux-3.3.8.orig/arch/arm/mach-bcm2708/bcm2708.c	2012-09-26 09:41:09.312789884 +0200
++++ linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c	2012-09-26 09:42:22.229151457 +0200
+@@ -848,6 +848,36 @@
+ }
+ #endif
+ 
++
++/* The assembly versions in delay.S don't account for core freq changing in cpufreq driver */
++/* Use 1MHz system timer for busy waiting */
++void __udelay(unsigned long usecs)
++{
++	unsigned long start = readl(__io_address(ST_BASE + 0x04));
++	unsigned long now;
++	do {
++		now = readl(__io_address(ST_BASE + 0x04));
++	} while ((long)(now - start) <= usecs);
++}
++
++
++void __const_udelay(unsigned long scaled_usecs)
++{
++	/* want /107374, this is about 3% bigger. We know usecs is less than 2000, so shouldn't overflow */
++	const unsigned long usecs = scaled_usecs * 10 >> 20;
++	unsigned long start = readl(__io_address(ST_BASE + 0x04));
++	unsigned long now;
++	do {
++		now = readl(__io_address(ST_BASE + 0x04));
++	} while ((long)(now - start) <= usecs);
++}
++
++void __delay(int loops)
++{
++	while (--loops > 0)
++		nop();
++}
++
+ MACHINE_START(BCM2708, "BCM2708")
+     /* Maintainer: Broadcom Europe Ltd. */
+     .map_io = bcm2708_map_io,.init_irq = bcm2708_init_irq,.timer =
