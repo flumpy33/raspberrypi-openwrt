@@ -1,0 +1,174 @@
+From 0479b305c5b7c8e3fa8e3002982cf8cac02b842e Mon Sep 17 00:00:00 2001
+From: Andreas Schwab <schwab@redhat.com>
+Date: Fri, 22 Jun 2012 11:10:31 -0700
+Subject: [PATCH] Fix invalid memory access in do_lookup_x.
+
+[BZ #13579] Do not free l_initfini and allow it to be reused
+on subsequent dl_open calls for the same library. This fixes
+the invalid memory access in do_lookup_x when the previously
+free'd l_initfini was accessed through l_searchlist when a
+library had been opened for the second time.
+---
+ ChangeLog      |   11 +++++++++++
+ NEWS           |   25 +++++++++++++------------
+ elf/dl-close.c |   15 +++------------
+ elf/dl-deps.c  |    7 ++++---
+ elf/dl-libc.c  |    9 ++++++---
+ elf/rtld.c     |    2 ++
+ include/link.h |    8 ++++----
+ 7 files changed, 43 insertions(+), 34 deletions(-)
+
+diff --git a/libc/elf/dl-close.c b/libc/elf/dl-close.c
+index d232294..a250ea5 100644
+--- a/libc/elf/dl-close.c
++++ b/libc/elf/dl-close.c
+@@ -1,5 +1,5 @@
+ /* Close a shared object opened by `_dl_open'.
+-   Copyright (C) 1996-2007, 2009, 2010, 2011 Free Software Foundation, Inc.
++   Copyright (C) 1996-2012 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -118,17 +118,8 @@ _dl_close_worker (struct link_map *map)
+   if (map->l_direct_opencount > 0 || map->l_type != lt_loaded
+       || dl_close_state != not_pending)
+     {
+-      if (map->l_direct_opencount == 0)
+-	{
+-	  if (map->l_type == lt_loaded)
+-	    dl_close_state = rerun;
+-	  else if (map->l_type == lt_library)
+-	    {
+-	      struct link_map **oldp = map->l_initfini;
+-	      map->l_initfini = map->l_orig_initfini;
+-	      _dl_scope_free (oldp);
+-	    }
+-	}
++      if (map->l_direct_opencount == 0 && map->l_type == lt_loaded)
++	dl_close_state = rerun;
+ 
+       /* There are still references to this object.  Do nothing more.  */
+       if (__builtin_expect (GLRO(dl_debug_mask) & DL_DEBUG_FILES, 0))
+diff --git a/elf/dl-deps.c b/elf/dl-deps.c
+index 69aec46..2ae496d 100644
+--- a/libc/elf/dl-deps.c
++++ b/libc/elf/dl-deps.c
+@@ -1,6 +1,5 @@
+ /* Load the dependencies of a mapped object.
+-   Copyright (C) 1996-2003, 2004, 2005, 2006, 2007, 2010, 2011
+-   Free Software Foundation, Inc.
++   Copyright (C) 1996-2012 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -488,6 +487,7 @@ _dl_map_object_deps (struct link_map *map,
+ 		  nneeded * sizeof needed[0]);
+ 	  atomic_write_barrier ();
+ 	  l->l_initfini = l_initfini;
++	  l->l_free_initfini = 1;
+ 	}
+ 
+       /* If we have no auxiliary objects just go on to the next map.  */
+@@ -688,6 +688,7 @@ Filters not supported with LD_TRACE_PRELINKING"));
+   l_initfini[nlist] = NULL;
+   atomic_write_barrier ();
+   map->l_initfini = l_initfini;
++  map->l_free_initfini = 1;
+   if (l_reldeps != NULL)
+     {
+       atomic_write_barrier ();
+@@ -696,7 +697,7 @@ Filters not supported with LD_TRACE_PRELINKING"));
+       _dl_scope_free (old_l_reldeps);
+     }
+   if (old_l_initfini != NULL)
+-      map->l_orig_initfini = old_l_initfini;
++    _dl_scope_free (old_l_initfini);
+ 
+   if (errno_reason)
+     _dl_signal_error (errno_reason == -1 ? 0 : errno_reason, objname,
+diff --git a/libc/elf/dl-libc.c b/libc/elf/dl-libc.c
+index a58e216..af2e663 100644
+--- a/libc/elf/dl-libc.c
++++ b/libc/elf/dl-libc.c
+@@ -1,6 +1,5 @@
+ /* Handle loading and unloading shared objects for internal libc purposes.
+-   Copyright (C) 1999-2002,2004-2006,2009,2010,2011
+-   Free Software Foundation, Inc.
++   Copyright (C) 1999-2012 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+    Contributed by Zack Weinberg <zack@rabi.columbia.edu>, 1999.
+ 
+@@ -269,13 +268,13 @@ libc_freeres_fn (free_mem)
+ 
+   for (Lmid_t ns = 0; ns < GL(dl_nns); ++ns)
+     {
+-      /* Remove all additional names added to the objects.  */
+       for (l = GL(dl_ns)[ns]._ns_loaded; l != NULL; l = l->l_next)
+ 	{
+ 	  struct libname_list *lnp = l->l_libname->next;
+ 
+ 	  l->l_libname->next = NULL;
+ 
++	  /* Remove all additional names added to the objects.  */
+ 	  while (lnp != NULL)
+ 	    {
+ 	      struct libname_list *old = lnp;
+@@ -283,6 +282,10 @@ libc_freeres_fn (free_mem)
+ 	      if (! old->dont_free)
+ 		free (old);
+ 	    }
++
++	  /* Free the initfini dependency list.  */
++	  if (l->l_free_initfini)
++	    free (l->l_initfini);
+ 	}
+ 
+       if (__builtin_expect (GL(dl_ns)[ns]._ns_global_scope_alloc, 0) != 0
+diff --git a/libc/elf/rtld.c b/libc/elf/rtld.c
+index a5b0ab9..6bcf224 100644
+--- a/libc/elf/rtld.c
++++ b/libc/elf/rtld.c
+@@ -2292,6 +2292,8 @@ ERROR: ld.so: object '%s' cannot be loaded as audit interface: %s; ignored.\n",
+ 	      lnp->dont_free = 1;
+ 	      lnp = lnp->next;
+ 	    }
++	  /* Also allocated with the fake malloc().  */
++	  l->l_free_initfini = 0;
+ 
+ 	  if (l != &GL(dl_rtld_map))
+ 	    _dl_relocate_object (l, l->l_scope, GLRO(dl_lazy) ? RTLD_LAZY : 0,
+diff --git a/libc/include/link.h b/libc/include/link.h
+index 2eb3179..f0c8ad5 100644
+--- a/libc/include/link.h
++++ b/libc/include/link.h
+@@ -1,6 +1,6 @@
+ /* Data structure for communication from the run-time dynamic linker for
+    loaded ELF shared objects.
+-   Copyright (C) 1995-2006, 2007, 2009, 2010, 2011 Free Software Foundation, Inc.
++   Copyright (C) 1995-2012 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -191,6 +191,9 @@ struct link_map
+ 						 during LD_TRACE_PRELINKING=1
+ 						 contains any DT_SYMBOLIC
+ 						 libraries.  */
++    unsigned int l_free_initfini:1; /* Nonzero if l_initfini can be
++				       freed, ie. not allocated with
++				       the dummy malloc in ld.so.  */
+ 
+     /* Collected information about own RPATH directories.  */
+     struct r_search_path_struct l_rpath_dirs;
+@@ -239,9 +242,6 @@ struct link_map
+ 
+     /* List of object in order of the init and fini calls.  */
+     struct link_map **l_initfini;
+-    /* The init and fini list generated at startup, saved when the
+-       object is also loaded dynamically.  */
+-    struct link_map **l_orig_initfini;
+ 
+     /* List of the dependencies introduced through symbol binding.  */
+     struct link_map_reldeps
+-- 
+1.7.3.4
+

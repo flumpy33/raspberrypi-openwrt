@@ -25,7 +25,7 @@ config EGLIBC_REVISION
 	depends on TOOLCHAINOPTS && USE_EGLIBC
 	default "15508" if EGLIBC_VERSION_2_13
 	default "16488" if EGLIBC_VERSION_2_14
-	default "18909" if EGLIBC_VERSION_2_15
+	default "20866" if EGLIBC_VERSION_2_15
 	default ""
 
 menu "eglibc configuration"
