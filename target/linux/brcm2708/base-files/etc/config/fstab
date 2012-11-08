@@ -1,0 +1,16 @@
+config global automount
+	option from_fstab 1
+	option anon_mount 0
+
+config global autoswap
+	option from_fstab 0
+	option anon_swap 0
+
+config mount
+	option target	/boot
+	option device	/dev/mmcblk0p1
+	option fstype	vfat
+	option options	ro,sync
+	option enabled	1
+	option enabled_fsck	0
+

@@ -4,11 +4,11 @@ Date: Fri, 5 Oct 2012 17:41:53 +0100
 Subject: [PATCH] Fix vc-mem by using module parameters
 
 
-diff --git a/arch/arm/mach-bcm2708/bcm2708.c b/arch/arm/mach-bcm2708/bcm2708.c
-index ac118a4..93fb75d 100644
---- a/arch/arm/mach-bcm2708/bcm2708.c
-+++ b/arch/arm/mach-bcm2708/bcm2708.c
-@@ -77,6 +77,7 @@ static DEFINE_CLOCK_DATA(cd);
+Index: linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c
+===================================================================
+--- linux-3.3.8.orig/arch/arm/mach-bcm2708/bcm2708.c	2012-11-08 21:44:56.000000000 +0100
++++ linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c	2012-11-08 21:48:34.972106201 +0100
+@@ -75,6 +75,7 @@
  
  /* command line parameters */
  static unsigned boardrev, serial;
@@ -16,12 +16,13 @@ index ac118a4..93fb75d 100644
  
  static void __init bcm2708_init_led(void);
  
-@@ -669,8 +670,12 @@ void __init bcm2708_init(void)
+@@ -665,9 +666,13 @@
  {
  	int i;
  
 +	printk("bcm2708.uart_clock = %d\n", uart_clock);
  	pm_power_off = bcm2708_power_off;
+ 	arm_pm_restart = bcm2708_reset;
  
 +	if (uart_clock)
 +		lookups[0].clk->rate = uart_clock;
@@ -29,7 +30,7 @@ index ac118a4..93fb75d 100644
  	for (i = 0; i < ARRAY_SIZE(lookups); i++)
  		clkdev_add(&lookups[i]);
  
-@@ -709,12 +714,6 @@ void __init bcm2708_init(void)
+@@ -706,12 +711,6 @@
  	bcm_register_device(&bcm2835_hwmon_device);
  	bcm_register_device(&bcm2835_thermal_device);
  
@@ -42,7 +43,7 @@ index ac118a4..93fb75d 100644
  	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
  		struct amba_device *d = amba_devs[i];
  		amba_device_register(d, &iomem_resource);
-@@ -885,7 +884,12 @@ void __const_udelay(unsigned long scaled_usecs)
+@@ -881,7 +880,12 @@
  
  MACHINE_START(BCM2708, "BCM2708")
      /* Maintainer: Broadcom Europe Ltd. */
@@ -58,10 +59,10 @@ index ac118a4..93fb75d 100644
 +module_param(boardrev, uint, 0644);
  module_param(serial, uint, 0644);
 +module_param(uart_clock, uint, 0644);
-diff --git a/arch/arm/mach-bcm2708/vc_mem.c b/arch/arm/mach-bcm2708/vc_mem.c
-index ae1810c..5c56b31 100644
---- a/arch/arm/mach-bcm2708/vc_mem.c
-+++ b/arch/arm/mach-bcm2708/vc_mem.c
+Index: linux-3.3.8/arch/arm/mach-bcm2708/vc_mem.c
+===================================================================
+--- linux-3.3.8.orig/arch/arm/mach-bcm2708/vc_mem.c	2012-11-08 21:44:54.000000000 +0100
++++ linux-3.3.8/arch/arm/mach-bcm2708/vc_mem.c	2012-11-08 21:46:28.331478222 +0100
 @@ -36,7 +36,7 @@
  #define DRIVER_NAME  "vc-mem"
  
@@ -71,7 +72,7 @@ index ae1810c..5c56b31 100644
  
  #if defined(ENABLE_DBG)
  #define LOG_DBG( fmt, ... )  printk( KERN_INFO fmt "\n", ##__VA_ARGS__ )
-@@ -77,6 +77,11 @@ EXPORT_SYMBOL(mm_vc_mem_phys_addr);
+@@ -77,6 +77,11 @@
  EXPORT_SYMBOL(mm_vc_mem_size);
  EXPORT_SYMBOL(mm_vc_mem_base);
  
@@ -83,7 +84,7 @@ index ae1810c..5c56b31 100644
  /****************************************************************************
  *
  *   vc_mem_open
-@@ -111,53 +116,6 @@ vc_mem_release(struct inode *inode, struct file *file)
+@@ -111,53 +116,6 @@
  	return 0;
  }
  
@@ -137,7 +138,7 @@ index ae1810c..5c56b31 100644
  /****************************************************************************
  *
  *   vc_mem_get_size
-@@ -167,7 +125,6 @@ static void vc_mem_update(void)
+@@ -167,7 +125,6 @@
  static void
  vc_mem_get_size(void)
  {
@@ -145,7 +146,7 @@ index ae1810c..5c56b31 100644
  }
  
  /****************************************************************************
-@@ -179,7 +136,6 @@ vc_mem_get_size(void)
+@@ -179,7 +136,6 @@
  static void
  vc_mem_get_base(void)
  {
@@ -153,7 +154,7 @@ index ae1810c..5c56b31 100644
  }
  
  /****************************************************************************
-@@ -191,7 +147,6 @@ vc_mem_get_base(void)
+@@ -191,7 +147,6 @@
  int
  vc_mem_get_current_size(void)
  {
@@ -161,7 +162,7 @@ index ae1810c..5c56b31 100644
  	return mm_vc_mem_size;
  }
  
-@@ -382,25 +337,26 @@ vc_mem_proc_write(struct file *file, const char __user * buffer,
+@@ -382,25 +337,26 @@
  
  /****************************************************************************
  *
@@ -196,7 +197,7 @@ index ae1810c..5c56b31 100644
  
  	if ((rc = alloc_chrdev_region(&vc_mem_devnum, 0, 1, DRIVER_NAME)) < 0) {
  		LOG_ERR("%s: alloc_chrdev_region failed (rc=%d)", __func__, rc);
-@@ -438,7 +394,7 @@ vc_mem_connected_init(void)
+@@ -438,7 +394,7 @@
  	vc_mem_proc_entry->write_proc = vc_mem_proc_write;
  
  	vc_mem_inited = 1;
@@ -205,7 +206,7 @@ index ae1810c..5c56b31 100644
  
        out_device_destroy:
  	device_destroy(vc_mem_class, vc_mem_devnum);
-@@ -454,23 +410,7 @@ vc_mem_connected_init(void)
+@@ -454,23 +410,7 @@
  	unregister_chrdev_region(vc_mem_devnum, 1);
  
        out_err:
@@ -230,7 +231,7 @@ index ae1810c..5c56b31 100644
  }
  
  /****************************************************************************
-@@ -497,3 +437,8 @@ module_init(vc_mem_init);
+@@ -497,3 +437,8 @@
  module_exit(vc_mem_exit);
  MODULE_LICENSE("GPL");
  MODULE_AUTHOR("Broadcom Corporation");
