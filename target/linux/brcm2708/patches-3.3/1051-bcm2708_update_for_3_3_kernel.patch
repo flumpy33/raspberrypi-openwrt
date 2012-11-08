@@ -1,7 +1,7 @@
 Index: linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c
 ===================================================================
---- linux-3.3.8.orig/arch/arm/mach-bcm2708/bcm2708.c	2012-09-16 19:22:59.000000000 +0200
-+++ linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c	2012-09-16 19:31:40.419948507 +0200
+--- linux-3.3.8.orig/arch/arm/mach-bcm2708/bcm2708.c	2012-11-07 15:40:30.905089672 +0100
++++ linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c	2012-11-08 21:36:53.080625706 +0100
 @@ -69,8 +69,6 @@
   */
  #define DMA_MASK_BITS_COMMON 32
@@ -31,7 +31,26 @@ Index: linux-3.3.8/arch/arm/mach-bcm2708/bcm2708.c
  }
  
  /*
-@@ -708,8 +698,7 @@
+@@ -578,11 +568,18 @@
+ 	arch_reset(0, "");
+ }
+ 
++static void bcm2708_reset(char str, const char *cmd)
++{
++	/* normal reset mechanism */
++	arch_reset(0, "");
++}
++
+ void __init bcm2708_init(void)
+ {
+ 	int i;
+ 
+ 	pm_power_off = bcm2708_power_off;
++	arm_pm_restart = bcm2708_reset;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+ 		clkdev_add(&lookups[i]);
+@@ -708,8 +705,7 @@
  	 */
  	setup_irq(IRQ_TIMER3, &bcm2708_timer_irq);
  
