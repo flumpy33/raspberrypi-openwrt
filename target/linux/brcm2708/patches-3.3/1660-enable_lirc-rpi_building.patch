@@ -1,0 +1,23 @@
+From 6f2064cb6807ac4a4d9edf258424db99f41b4f2b Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Thu, 8 Nov 2012 00:00:18 +0000
+Subject: [PATCH] Enable building of lirc-rpi
+
+
+diff --git a/arch/arm/configs/bcmrpi_defconfig b/arch/arm/configs/bcmrpi_defconfig
+index 539470e..e0c7940 100644
+--- a/arch/arm/configs/bcmrpi_defconfig
++++ b/arch/arm/configs/bcmrpi_defconfig
+@@ -812,6 +812,12 @@ CONFIG_W35UND=m
+ CONFIG_PRISM2_USB=m
+ CONFIG_R8712U=m
+ CONFIG_ZRAM=m
++CONFIG_STAGING_MEDIA=y
++CONFIG_LIRC_STAGING=y
++CONFIG_LIRC_IGORPLUGUSB=m
++CONFIG_LIRC_RPI=m
++CONFIG_LIRC_SASEM=m
++CONFIG_LIRC_TTUSBIR=m
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT4_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
