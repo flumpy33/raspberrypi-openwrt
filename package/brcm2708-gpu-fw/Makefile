@@ -8,12 +8,12 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=brcm2708-gpu-fw
-PKG_REV:=537c78b113d06e37e2cca90a0b3d3f39a129ee23
+PKG_REV:=7dbdfe93d8e71490fbf42f084668f6d14a805028
 PKG_VERSION:=20121030
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
-PKG_SOURCE_URL:=git://github.com/raspberrypi/firmware.git
+PKG_SOURCE_URL:=https://code.google.com/p/raspberrypi-openwrt.firmware/
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
 PKG_SOURCE_VERSION:=$(PKG_REV)
