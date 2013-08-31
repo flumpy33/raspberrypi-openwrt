@@ -1,7 +1,7 @@
 /*
  * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
  *
- * Copyright (C) 2002-2007 Aleph One Ltd.
+ * Copyright (C) 2002-2010 Aleph One Ltd.
  *   for Toby Churchill Ltd and Brightstar Engineering
  *
  * Created by Charles Manning <charles@aleph1.co.uk>
@@ -27,9 +27,6 @@
  * Bit 0 of each entry indicates whether the entry has an odd or even parity, and therefore
  * this bytes influence on the line parity.
  */
-
-const char *yaffs_ecc_c_version =
-    "$Id: yaffs_ecc.c,v 1.9 2007-02-14 01:09:06 wookey Exp $";
 
 #include "yportenv.h"
 
@@ -72,7 +69,7 @@ static const unsigned char column_parity_table[] = {
 
 /* Count the bits in an unsigned char or a U32 */
 
-static int yaffs_CountBits(unsigned char x)
+static int yaffs_count_bits(unsigned char x)
 {
 	int r = 0;
 	while (x) {
@@ -83,7 +80,7 @@ static int yaffs_CountBits(unsigned char x)
 	return r;
 }
 
-static int yaffs_CountBits32(unsigned x)
+static int yaffs_count_bits32(unsigned x)
 {
 	int r = 0;
 	while (x) {
@@ -95,7 +92,7 @@ static int yaffs_CountBits32(unsigned x)
 }
 
 /* Calculate the ECC for a 256-byte block of data */
-void yaffs_ECCCalculate(const unsigned char *data, unsigned char *ecc)
+void yaffs_ecc_cacl(const unsigned char *data, unsigned char *ecc)
 {
 	unsigned int i;
 
@@ -109,12 +106,10 @@ void yaffs_ECCCalculate(const unsigned char *data, unsigned char *ecc)
 		b = column_parity_table[*data++];
 		col_parity ^= b;
 
-		if (b & 0x01)	// odd number of bits in the byte
-		{
+		if (b & 0x01) {		/* odd number of bits in the byte */
 			line_parity ^= i;
 			line_parity_prime ^= ~i;
 		}
-
 	}
 
 	ecc[2] = (~col_parity) | 0x03;
@@ -158,7 +153,7 @@ void yaffs_ECCCalculate(const unsigned char *data, unsigned char *ecc)
 	ecc[0] = ~t;
 
 #ifdef CONFIG_YAFFS_ECC_WRONG_ORDER
-	// Swap the bytes into the wrong order
+	/* Swap the bytes into the wrong order */
 	t = ecc[0];
 	ecc[0] = ecc[1];
 	ecc[1] = t;
@@ -168,7 +163,7 @@ void yaffs_ECCCalculate(const unsigned char *data, unsigned char *ecc)
 
 /* Correct the ECC on a 256 byte block of data */
 
-int yaffs_ECCCorrect(unsigned char *data, unsigned char *read_ecc,
+int yaffs_ecc_correct(unsigned char *data, unsigned char *read_ecc,
 		     const unsigned char *test_ecc)
 {
 	unsigned char d0, d1, d2;	/* deltas */
@@ -189,7 +184,7 @@ int yaffs_ECCCorrect(unsigned char *data, unsigned char *read_ecc,
 		unsigned bit;
 
 #ifdef CONFIG_YAFFS_ECC_WRONG_ORDER
-		// swap the bytes to correct for the wrong order
+		/* swap the bytes to correct for the wrong order */
 		unsigned char t;
 
 		t = d0;
@@ -228,9 +223,9 @@ int yaffs_ECCCorrect(unsigned char *data, unsigned char *read_ecc,
 		return 1; /* Corrected the error */
 	}
 
-	if ((yaffs_CountBits(d0) +
-	     yaffs_CountBits(d1) +
-	     yaffs_CountBits(d2)) ==  1) {
+	if ((yaffs_count_bits(d0) +
+	     yaffs_count_bits(d1) +
+	     yaffs_count_bits(d2)) ==  1) {
 		/* Reccoverable error in ecc */
 
 		read_ecc[0] = test_ecc[0];
@@ -250,8 +245,8 @@ int yaffs_ECCCorrect(unsigned char *data, unsigned char *read_ecc,
 /*
  * ECCxxxOther does ECC calcs on arbitrary n bytes of data
  */
-void yaffs_ECCCalculateOther(const unsigned char *data, unsigned nBytes,
-			     yaffs_ECCOther * eccOther)
+void yaffs_ecc_calc_other(const unsigned char *data, unsigned n_bytes,
+				yaffs_ECCOther *eccOther)
 {
 	unsigned int i;
 
@@ -260,7 +255,7 @@ void yaffs_ECCCalculateOther(const unsigned char *data, unsigned nBytes,
 	unsigned line_parity_prime = 0;
 	unsigned char b;
 
-	for (i = 0; i < nBytes; i++) {
+	for (i = 0; i < n_bytes; i++) {
 		b = column_parity_table[*data++];
 		col_parity ^= b;
 
@@ -277,9 +272,9 @@ void yaffs_ECCCalculateOther(const unsigned char *data, unsigned nBytes,
 	eccOther->lineParityPrime = line_parity_prime;
 }
 
-int yaffs_ECCCorrectOther(unsigned char *data, unsigned nBytes,
-			  yaffs_ECCOther * read_ecc,
-			  const yaffs_ECCOther * test_ecc)
+int yaffs_ecc_correct_other(unsigned char *data, unsigned n_bytes,
+			yaffs_ECCOther *read_ecc,
+			const yaffs_ECCOther *test_ecc)
 {
 	unsigned char cDelta;	/* column parity delta */
 	unsigned lDelta;	/* line parity delta */
@@ -294,8 +289,7 @@ int yaffs_ECCCorrectOther(unsigned char *data, unsigned nBytes,
 		return 0; /* no error */
 
 	if (lDelta == ~lDeltaPrime &&
-	    (((cDelta ^ (cDelta >> 1)) & 0x15) == 0x15))
-	{
+	    (((cDelta ^ (cDelta >> 1)) & 0x15) == 0x15)) {
 		/* Single bit (recoverable) error in data */
 
 		bit = 0;
@@ -307,7 +301,7 @@ int yaffs_ECCCorrectOther(unsigned char *data, unsigned nBytes,
 		if (cDelta & 0x02)
 			bit |= 0x01;
 
-		if(lDelta >= nBytes)
+		if (lDelta >= n_bytes)
 			return -1;
 
 		data[lDelta] ^= (1 << bit);
@@ -315,8 +309,8 @@ int yaffs_ECCCorrectOther(unsigned char *data, unsigned nBytes,
 		return 1; /* corrected */
 	}
 
-	if ((yaffs_CountBits32(lDelta) + yaffs_CountBits32(lDeltaPrime) +
-	     yaffs_CountBits(cDelta)) == 1) {
+	if ((yaffs_count_bits32(lDelta) + yaffs_count_bits32(lDeltaPrime) +
+			yaffs_count_bits(cDelta)) == 1) {
 		/* Reccoverable error in ecc */
 
 		*read_ecc = *test_ecc;
@@ -326,6 +320,4 @@ int yaffs_ECCCorrectOther(unsigned char *data, unsigned nBytes,
 	/* Unrecoverable error */
 
 	return -1;
-
 }
-

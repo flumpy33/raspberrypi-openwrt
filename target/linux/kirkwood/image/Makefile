@@ -7,11 +7,7 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
-JFFS2OPTS += --little-endian --pagesize=0x800 --no-cleanmarkers --pad
-
-define Image/Prepare
-	cp $(LINUX_DIR)/arch/arm/boot/uImage $(KDIR)/uImage
-endef
+NAND_BLOCKSIZE := 2048:128k
 
 define Image/BuildKernel
 # do mach-id fixup here, if needed
@@ -25,7 +21,7 @@ define Image/Build
 	)
 endef
 
-define Image/Build/jffs2-128k
+define Image/Build/jffs2-nand-2048-128k
 	dd if=$(KDIR)/root.$(1) of=$(BIN_DIR)/$(IMG_PREFIX)-$(PROFILE)-$(1).img \
 		bs=2048 conv=sync
 endef

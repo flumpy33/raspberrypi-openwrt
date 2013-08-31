@@ -21,7 +21,7 @@ define Package/Default
   MDEPENDS:=
   PROVIDES:=
   EXTRA_DEPENDS:=
-  MAINTAINER:=OpenWrt Developers Team <openwrt-devel@openwrt.org>
+  MAINTAINER:=$(PKG_MAINTAINER)
   SOURCE:=$(patsubst $(TOPDIR)/%,%,$(CURDIR))
   ifneq ($(PKG_VERSION),)
     ifneq ($(PKG_RELEASE),)
@@ -42,7 +42,6 @@ define Package/Default
   else
     PKGARCH:=$(BOARD)
   endif
-  PRIORITY:=optional
   DEFAULT:=
   MENU:=
   SUBMENU:=
@@ -129,7 +128,7 @@ MAKE_INSTALL_FLAGS = \
 MAKE_PATH = .
 
 define Build/Compile/Default
-	$(MAKE_VARS) \
+	+$(MAKE_VARS) \
 	$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR)/$(MAKE_PATH) \
 		$(MAKE_FLAGS) \
 		$(1);

@@ -9,37 +9,54 @@ RAMFS_COPY_DATA=/lib/ramips.sh
 
 platform_check_image() {
 	local board=$(ramips_board_name)
-	local magic="$(get_magic_word "$1")"
+	local magic="$(get_magic_long "$1")"
 
 	[ "$ARGC" -gt 1 ] && return 1
 
 	case "$board" in
 	3g-6200n | \
+	3g-6200nl | \
+	3g300m | \
+	w150m | \
+	air3gii | \
 	all0239-3g | \
 	all0256n | \
 	all5002 | \
+	all5003 | \
+	asl26555 | \
 	bc2 | \
+	broadway | \
 	carambola | \
+	d105 | \
 	dir-300-b1 | \
 	dir-600-b1 | \
 	dir-600-b2 | \
 	dir-615-h1 | \
+	dir-615-d | \
 	dir-620-a1 | \
+	dir-620-d1 | \
 	dap-1350 | \
 	esr-9753 | \
+	f7c027 | \
 	fonera20n | \
+	rt-n13u | \
 	freestation5 | \
 	hw550-3g | \
 	mofi3500-3gn | \
+	mpr-a2 | \
+	mzk-w300nh2 | \
 	nbg-419n | \
 	nw718 | \
 	omni-emb | \
+	omni-emb-hpm | \
 	psr-680w | \
 	rt-g32-b1 | \
 	rt-n10-plus | \
 	rt-n15 | \
 	rt-n56u | \
 	sl-r7205 | \
+	tew-691gr | \
+	tew-692gr | \
 	w306r-v20 |\
 	w502u |\
 	wr6202 |\
@@ -47,11 +64,20 @@ platform_check_image() {
 	wl341v3 | \
 	wl-330n | \
 	wl-351 | \
+	wnce2001 | \
 	wli-tx4-ag300n | \
 	whr-g300n |\
+	ur-326n4g |\
 	ur-336un |\
 	wr512-3gn)
-		[ "$magic" != "2705" ] && {
+		[ "$magic" != "27051956" ] && {
+			echo "Invalid image type."
+			return 1
+		}
+		return 0
+		;;
+	dir-645)
+		[ "$magic" != "5ea3a417" ] && {
 			echo "Invalid image type."
 			return 1
 		}

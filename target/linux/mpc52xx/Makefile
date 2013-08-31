@@ -12,12 +12,14 @@ BOARDNAME:=Freescale MPC52xx
 CFLAGS:=-Os -pipe -fno-caller-saves -mcpu=603e
 FEATURES:=targz ext4
 
-LINUX_VERSION:=3.3.8
+LINUX_VERSION:=3.8.13
 
 include $(INCLUDE_DIR)/target.mk
 
 define Target/Description
 	Build images for the Freescale MPC52xx based boards.
 endef
+
+KERNELNAME:="zImage"
 
 $(eval $(call BuildTarget))

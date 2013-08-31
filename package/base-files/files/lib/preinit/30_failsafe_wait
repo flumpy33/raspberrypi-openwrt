@@ -61,11 +61,9 @@ fs_wait_for_key () {
     }
     lock -w $keypress_wait
 
-    trap - INT
-    trap - USR1
-
     keypressed=1
     [ "$(cat $keypress_true)" = "true" ] && keypressed=0
+    
     rm -f $keypress_true
     rm -f $keypress_wait
     rm -f $keypress_sec
@@ -75,10 +73,15 @@ fs_wait_for_key () {
 
 failsafe_wait() {
     FAILSAFE=
-    pi_failsafe_net_message=true
-    preinit_net_echo "Please press button now to enter failsafe"
-    pi_failsafe_net_message=false
-    fs_wait_for_key f 'to enter failsafe mode' $fs_failsafe_wait_timeout && FAILSAFE=true && export FAILSAFE
+    grep -q 'failsafe=' /proc/cmdline && FAILSAFE=true && export FAILSAFE
+    if [ "$FAILSAFE" != "true" ]; then
+      pi_failsafe_net_message=true
+      preinit_net_echo "Please press button now to enter failsafe"
+      pi_failsafe_net_message=false
+      fs_wait_for_key f 'to enter failsafe mode' $fs_failsafe_wait_timeout && FAILSAFE=true
+      [ -f "/tmp/failsafe_button" ] && FAILSAFE=true
+      [ "$FAILSAFE" = "true" ] && export FAILSAFE && touch /tmp/failsafe
+    fi
 }
 
 boot_hook_add preinit_main failsafe_wait

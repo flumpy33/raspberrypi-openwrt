@@ -21,8 +21,8 @@ install_bin() { # <file> [ <symlink> ... ]
 	files=$1
 	[ -x "$src" ] && files="$src $(libs $src)"
 	install_file $files
-	[ -e /lib/ld-linux.so.3 ] && {
-		install_file /lib/ld-linux.so.3
+	[ -e /lib/ld.so.1 ] && {
+		install_file /lib/ld.so.1
 	}
 	shift
 	for link in "$@"; do {
@@ -33,19 +33,19 @@ install_bin() { # <file> [ <symlink> ... ]
 	}; done
 }
 
-pivot() { # <new_root> <old_root>
+supivot() { # <new_root> <old_root>
 	mount | grep "on $1 type" 2>&- 1>&- || mount -o bind $1 $1
 	mkdir -p $1$2 $1/proc $1/sys $1/dev $1/tmp $1/overlay && \
-	mount -o move /proc $1/proc && \
+	mount -o noatime,move /proc $1/proc && \
 	pivot_root $1 $1$2 || {
-        umount $1 $1
+        umount -l $1 $1
 		return 1
 	}
 
-	mount -o move $2/sys /sys
-	mount -o move $2/dev /dev
-	mount -o move $2/tmp /tmp
-	mount -o move $2/overlay /overlay 2>&-
+	mount -o noatime,move $2/sys /sys
+	mount -o noatime,move $2/dev /dev
+	mount -o noatime,move $2/tmp /tmp
+	mount -o noatime,move $2/overlay /overlay 2>&-
 	return 0
 }
 
@@ -62,7 +62,7 @@ run_ramfs() { # <command> [...]
 	done
 	install_file /etc/resolv.conf /lib/functions.sh /lib/functions.sh /lib/upgrade/*.sh $RAMFS_COPY_DATA
 
-	pivot $RAM_ROOT /mnt || {
+	supivot $RAM_ROOT /mnt || {
 		echo "Failed to switch over to ramfs. Please reboot."
 		exit 1
 	}
@@ -71,7 +71,7 @@ run_ramfs() { # <command> [...]
 	umount -l /mnt
 
 	grep /overlay /proc/mounts > /dev/null && {
-		mount -o remount,ro /overlay
+		mount -o noatime,remount,ro /overlay
 		umount -l /overlay
 	}
 
@@ -99,7 +99,7 @@ kill_remaining() { # [ <signal> ]
 
 		case "$name" in
 			# Skip essential services
-			*ash*|*init*|*watchdog*|*ssh*|*dropbear*|*telnet*|*login*|*hostapd*|*wpa_supplicant*) : ;;
+			*procd*|*ash*|*init*|*watchdog*|*ssh*|*dropbear*|*telnet*|*login*|*hostapd*|*wpa_supplicant*) : ;;
 
 			# Killable process
 			*)
@@ -157,14 +157,14 @@ get_image() { # <source> [ <command> ]
 		*) cmd="cat";;
 	esac
 	if [ -z "$conc" ]; then
-		local magic="$(eval $cmd $from | dd bs=2 count=1 2>/dev/null | hexdump -n 2 -e '1/1 "%02x"')"
+		local magic="$(eval $cmd $from 2>/dev/null | dd bs=2 count=1 2>/dev/null | hexdump -n 2 -e '1/1 "%02x"')"
 		case "$magic" in
 			1f8b) conc="zcat";;
 			425a) conc="bzcat";;
 		esac
 	fi
 
-	eval "$cmd $from ${conc:+| $conc}"
+	eval "$cmd $from 2>/dev/null ${conc:+| $conc}"
 }
 
 get_magic_word() {

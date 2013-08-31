@@ -1,5 +1,8 @@
 /*
+ * Infineon/ADMTek 8668 (WildPass) platform devices support
+ *
  * Copyright (C) 2010 Scott Nicholas <neutronscott@scottn.us>
+ * Copyright (C) 2012 Florian Fainelli <florian@openwrt.org>
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -9,10 +12,16 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/platform_data/tulip.h>
+#include <linux/usb/ehci_pdriver.h>
 #include <linux/mtd/physmap.h>
+#include <linux/mtd/partitions.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
+#include <linux/amba/bus.h>
+#include <linux/amba/serial.h>
+
 #include <asm/reboot.h>
 #include <asm/time.h>
 #include <asm/addrspace.h>
@@ -20,23 +29,35 @@
 #include <asm/io.h>
 #include <adm8668.h>
 
-static struct resource uart_resources[] = {
-	{
+#define ADM8868_UBOOT_ENV		0x20000
+#define ADM8868_UBOOT_WAN_MAC		0x5ac
+#define ADM8868_UBOOT_LAN_MAC		0x404
+
+static void adm8668_uart_set_mctrl(struct amba_device *dev,
+					void __iomem *base,
+					unsigned int mcrtl)
+{
+}
+
+static struct amba_pl010_data adm8668_uart0_data = {
+	.set_mctrl = adm8668_uart_set_mctrl,
+};
+
+static struct amba_device adm8668_uart0_device = {
+	.dev = {
+		.init_name	= "apb:uart0",
+		.platform_data	= &adm8668_uart0_data,
+	},
+	.res = {
 		.start		= ADM8668_UART0_BASE,
 		.end		= ADM8668_UART0_BASE + 0xF,
 		.flags		= IORESOURCE_MEM,
 	},
-	{
-		.start		= INT_LVL_UART0,
-		.flags		= IORESOURCE_IRQ,
+	.irq = {
+		ADM8668_UART0_IRQ,
+		-1
 	},
-};
-
-static struct platform_device adm8668_uart_device = {
-	.name		= "adm8668_uart",
-	.id		= 0,
-	.resource	= uart_resources,
-	.num_resources	= ARRAY_SIZE(uart_resources),
+	.periphid = 0x0041010,
 };
 
 static struct resource eth0_resources[] = {
@@ -46,16 +67,21 @@ static struct resource eth0_resources[] = {
 		.flags		= IORESOURCE_MEM,
 	},
 	{
-		.start		= INT_LVL_LAN,
+		.start		= ADM8668_LAN_IRQ,
 		.flags		= IORESOURCE_IRQ,
 	},
 };
 
+static struct tulip_platform_data eth0_pdata = {
+	.chip_id	= ADM8668,
+};
+
 static struct platform_device adm8668_eth0_device = {
-	.name		= "adm8668_eth",
+	.name		= "tulip",
 	.id		= 0,
 	.resource	= eth0_resources,
 	.num_resources	= ARRAY_SIZE(eth0_resources),
+	.dev.platform_data = &eth0_pdata,
 };
 
 static struct resource eth1_resources[] = {
@@ -65,87 +91,134 @@ static struct resource eth1_resources[] = {
 		.flags		= IORESOURCE_MEM,
 	},
 	{
-		.start		= INT_LVL_WAN,
+		.start		= ADM8668_WAN_IRQ,
 		.flags		= IORESOURCE_IRQ,
 	},
 };
 
+static struct tulip_platform_data eth1_pdata = {
+	.chip_id	= ADM8668,
+};
+
 static struct platform_device adm8668_eth1_device = {
-	.name		= "adm8668_eth",
+	.name		= "tulip",
 	.id		= 1,
 	.resource	= eth1_resources,
 	.num_resources	= ARRAY_SIZE(eth1_resources),
+	.dev.platform_data = &eth1_pdata,
 };
 
-static void adm8668_restart(char *cmd)
+static const char *nor_probe_types[] = { "adm8668part", NULL };
+
+static struct physmap_flash_data nor_flash_data = {
+	.width			= 2,
+	.part_probe_types	= nor_probe_types,
+};
+
+static struct resource nor_resources[] = {
+	{
+		.start	= ADM8668_SMEM1_BASE,
+		.end	= ADM8668_SMEM1_BASE + 0x800000 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device adm8668_nor_device = {
+	.name		= "physmap-flash",
+	.id		= -1,
+	.resource	= nor_resources,
+	.num_resources	= ARRAY_SIZE(nor_resources),
+	.dev.platform_data = &nor_flash_data,
+};
+
+static struct resource usb_resources[] = {
+	{
+		.start	= ADM8668_USB_BASE,
+		.end	= ADM8668_USB_BASE + 0x1FFFFF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= ADM8668_USB_IRQ,
+		.end	= ADM8668_USB_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct usb_ehci_pdata usb_pdata = {
+	.caps_offset	= 0x100,
+	.has_tt		= 1,
+	.port_power_off	= 1,
+};
+
+static struct platform_device adm8668_usb_device = {
+	.name		= "ehci-platform",
+	.id		= -1,
+	.resource	= usb_resources,
+	.num_resources	= ARRAY_SIZE(usb_resources),
+	.dev.platform_data = &usb_pdata,
+};
+
+static struct platform_device *adm8668_devs[] = {
+	&adm8668_eth0_device,
+	&adm8668_eth1_device,
+	&adm8668_nor_device,
+	&adm8668_usb_device,
+};
+
+static void adm8668_fetch_mac(int unit)
 {
-	int i;
+	u8 *mac;
+	u32 offset;
+	struct tulip_platform_data *pdata;
 
-	/* stop eth0 and eth1 */
-	ADM8668_LAN_REG(NETCSR6) = (1 << 13) | (1 << 1);
-	ADM8668_LAN_REG(NETCSR7) = 0;
-	ADM8668_WAN_REG(NETCSR6) = (1 << 13) | (1 << 1);
-	ADM8668_WAN_REG(NETCSR7) = 0;
+	switch (unit) {
+	case -1:
+	case 0:
+		offset = ADM8868_UBOOT_LAN_MAC;
+		pdata = &eth0_pdata;
+		break;
+	case 1:
+		offset = ADM8868_UBOOT_WAN_MAC;
+		pdata = &eth1_pdata;
+		break;
+	default:
+		pr_err("unsupported ethernet unit: %d\n", unit);
+		return;
+	}
 
-	/* reset PHY */
-	ADM8668_WAN_REG(NETCSR37) = 0x20;
-	for (i = 0; i < 10000; i++)
-		;
-	ADM8668_WAN_REG(NETCSR37) = 0;
-	for (i = 0; i < 10000; i++)
-		;
+	mac = (u8 *)(KSEG1ADDR(ADM8668_SMEM1_BASE) + ADM8868_UBOOT_ENV + offset);
 
-	*(volatile unsigned int *)0xB1600000 = 1;	/* reset eth0 mac */
-	*(volatile unsigned int *)0xB1A00000 = 1;	/* reset eth1 mac */
-	*(volatile unsigned int *)0xB1800000 = 1;	/* reset wlan0 mac */
-
-	/* the real deal */
-	for (i = 0; i < 1000; i++)
-		;
-	ADM8668_CONFIG_REG(ADM8668_CR1) = 1;
+	memcpy(pdata->mac, mac, sizeof(pdata->mac));
 }
+
+static void adm8668_ehci_workaround(void)
+{
+	u32 chipid;
+
+	chipid = ADM8668_CONFIG_REG(ADM8668_CR0);
+	ADM8668_CONFIG_REG(ADM8668_CR66) = 0x0C1600D9;
+
+	if (chipid == 0x86880001)
+		return;
+
+	ADM8668_CONFIG_REG(ADM8668_CR66) &= ~(3 << 20);
+	ADM8668_CONFIG_REG(ADM8668_CR66) |= (1 << 20);
+	pr_info("ADM8668: applied USB workaround\n");
+}
+
 
 int __devinit adm8668_devs_register(void)
 {
-	_machine_restart = adm8668_restart;
-	platform_device_register(&adm8668_uart_device);
-	platform_device_register(&adm8668_eth0_device);
-	platform_device_register(&adm8668_eth1_device);
+	int ret;
 
-	return 0;
+	ret = amba_device_register(&adm8668_uart0_device, &iomem_resource);
+	if (ret)
+		panic("failed to register AMBA UART");
+
+	adm8668_fetch_mac(0);
+	adm8668_fetch_mac(1);
+	adm8668_ehci_workaround();
+
+	return platform_add_devices(adm8668_devs, ARRAY_SIZE(adm8668_devs));
 }
-
-void __init plat_time_init(void)
-{
-	int adj = (ADM8668_CONFIG_REG(ADM8668_CR3) >> 11) & 0xf;
-
-	/* adjustable clock selection
-	   CR3 bit 14~11, 0000 -> 175MHz, 0001 -> 180MHz, etc... */
-
-	mips_hpt_frequency = (SYS_CLOCK + adj * 5000000) / 2;
-	printk("ADM8668 CPU clock: %d MHz\n", 2*mips_hpt_frequency / 1000000);
-}
-
-void __init plat_mem_setup(void)
-{
-	/* prom_init seemed like easier place for this. it's tooo simple */
-}
-
-const char *get_system_type(void)
-{
-        unsigned long chipid = ADM8668_CONFIG_REG(ADM8668_CR0);
-        int adj = (ADM8668_CONFIG_REG(ADM8668_CR3) >> 11) & 0xf;
-        int product, revision, mhz;
-	static char ret[32];
-
-        product = chipid >> 16;
-        revision = chipid & 0xffff;
-	mhz = (SYS_CLOCK/1000000) + (adj * 5);
-
-	/* i getting fancy :\ */
-	snprintf(ret, sizeof(ret), "ADM%xr%x %dMHz", product, revision, mhz);
-
-	return ret;
-}
-
 arch_initcall(adm8668_devs_register);

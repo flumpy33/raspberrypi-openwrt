@@ -31,17 +31,24 @@ define Image/Build/Freecom
 	rm -f $(TARGET_DIR)/zImage
 endef
 
-define Image/Prepare
-	cp $(LINUX_DIR)/arch/arm/boot/zImage $(KDIR)/zImage
-endef
-
 define Image/BuildKernel
 	cp $(KDIR)/zImage $(BIN_DIR)/$(IMG_PREFIX)-zImage
 	BIN_DIR=$(BIN_DIR) IMG_PREFIX="$(IMG_PREFIX)" $(TOPDIR)/scripts/arm-magic.sh
 endef
 
+# Build sysupgrade image
+define BuildFirmware/Generic
+	dd if=$(KDIR)/zImage of=$(KDIR)/zImage.pad bs=64k conv=sync; \
+	dd if=$(KDIR)/root.$(1) of=$(KDIR)/root.$(1).pad bs=128k conv=sync; \
+	sh $(TOPDIR)/scripts/combined-image.sh \
+		$(KDIR)/zImage.pad \
+		$(KDIR)/root.$(1).pad \
+		$(BIN_DIR)/$(IMG_PREFIX)-$(patsubst jffs2-%,jffs2,$(patsubst squashfs-%,squashfs,$(1)))-sysupgrade.bin
+endef
+
 define Image/Build
 	$(call Image/Build/$(1),$(1))
+	$(call BuildFirmware/Generic,$(1))
 endef
 
 define Image/Build/jffs2-64k

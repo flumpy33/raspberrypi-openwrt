@@ -13,6 +13,8 @@ PKG_SOURCE_URL:=http://www.multiprecision.org/mpc/download/
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_MD5SUM:=0d6acab8d214bd7d1fbbc593e83dd00d
 
+HOST_BUILD_PARALLEL:=1
+
 include $(INCLUDE_DIR)/host-build.mk
 
 unexport CFLAGS
@@ -22,14 +24,5 @@ HOST_CONFIGURE_ARGS += \
 	--disable-shared \
 	--with-mpfr=$(TOPDIR)/staging_dir/host \
 	--with-gmp=$(TOPDIR)/staging_dir/host
-
-define Host/Configure
-	(cd $(HOST_BUILD_DIR)/$(3); \
-		$(HOST_CONFIGURE_CMD) \
-		$(HOST_CONFIGURE_VARS) \
-		$(HOST_CONFIGURE_ARGS); \
-	)
-endef
-
 
 $(eval $(call HostBuild))

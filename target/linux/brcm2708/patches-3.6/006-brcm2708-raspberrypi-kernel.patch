@@ -1,0 +1,75 @@
+unchanged:
+--- a/include/linux/broadcom/vc_cma.h	1970-01-01 01:00:00.000000000 +0100
++++ b/include/linux/broadcom/vc_cma.h	2013-06-30 10:28:06.426569019 +0200
+@@ -0,0 +1,30 @@
++/*****************************************************************************
++* Copyright 2012 Broadcom Corporation.  All rights reserved.
++*
++* Unless you and Broadcom execute a separate written software license
++* agreement governing use of this software, this software is licensed to you
++* under the terms of the GNU General Public License version 2, available at
++* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
++*
++* Notwithstanding the above, under no circumstances may you combine this
++* software in any way with any other Broadcom software provided under a
++* license other than the GPL, without Broadcom's express prior written
++* consent.
++*****************************************************************************/
++
++#if !defined( VC_CMA_H )
++#define VC_CMA_H
++
++#include <linux/ioctl.h>
++
++#define VC_CMA_IOC_MAGIC 0xc5
++
++#define VC_CMA_IOC_RESERVE _IO(VC_CMA_IOC_MAGIC, 0)
++
++#ifdef __KERNEL__
++extern void __init vc_cma_early_init(void);
++extern void __init vc_cma_reserve(void);
++#endif
++
++#endif /* VC_CMA_H */
++
+only in patch2:
+unchanged:
+--- a/kernel/module.c	2012-12-17 18:27:45.000000000 +0100
++++ b/kernel/module.c	2013-06-30 10:28:08.974569004 +0200
+@@ -2680,20 +2680,23 @@
+ 	memset(ptr, 0, mod->core_size);
+ 	mod->module_core = ptr;
+ 
+-	ptr = module_alloc_update_bounds(mod->init_size);
+-	/*
+-	 * The pointer to this block is stored in the module structure
+-	 * which is inside the block. This block doesn't need to be
+-	 * scanned as it contains data and code that will be freed
+-	 * after the module is initialized.
+-	 */
+-	kmemleak_ignore(ptr);
+-	if (!ptr && mod->init_size) {
+-		module_free(mod, mod->module_core);
+-		return -ENOMEM;
++	if (mod->init_size) {
++		ptr = module_alloc_update_bounds(mod->init_size);
++		/*
++		 * The pointer to this block is stored in the module structure
++		 * which is inside the block. This block doesn't need to be
++		 * scanned as it contains data and code that will be freed
++		 * after the module is initialized.
++		 */
++		kmemleak_ignore(ptr);
++		if (!ptr && mod->init_size) {
++			module_free(mod, mod->module_core);
++			return -ENOMEM;
++		}
++		memset(ptr, 0, mod->init_size);
++		mod->module_init = ptr;
+ 	}
+-	memset(ptr, 0, mod->init_size);
+-	mod->module_init = ptr;
++	else mod->module_init = NULL;
+ 
+ 	/* Transfer each section which specifies SHF_ALLOC */
+ 	pr_debug("final section addresses:\n");

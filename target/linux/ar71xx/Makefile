@@ -9,11 +9,11 @@ include $(TOPDIR)/rules.mk
 ARCH:=mips
 BOARD:=ar71xx
 BOARDNAME:=Atheros AR7xxx/AR9xxx
-FEATURES:=squashfs jffs2 targz
-CFLAGS:=-Os -pipe -mips32r2 -mtune=mips32r2 -fno-caller-saves
+FEATURES:=squashfs targz mips16
+CFLAGS:=-Os -pipe -mips32r2 -mtune=34kc -fno-caller-saves -mno-branch-likely
 SUBTARGETS:=generic nand
 
-LINUX_VERSION:=3.3.8
+LINUX_VERSION:=3.8.13
 
 include $(INCLUDE_DIR)/target.mk
 

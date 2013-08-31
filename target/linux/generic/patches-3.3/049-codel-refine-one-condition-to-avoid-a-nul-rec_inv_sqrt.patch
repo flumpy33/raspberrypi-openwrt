@@ -1,16 +1,9 @@
-From patchwork Mon Jul 30 06:52:21 2012
-Content-Type: text/plain; charset="utf-8"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Subject: codel: refine one condition to avoid a nul rec_inv_sqrt
-Date: Sun, 29 Jul 2012 20:52:21 -0000
-From: Eric Dumazet <eric.dumazet@gmail.com>
-X-Patchwork-Id: 173968
-Message-Id: <1343631141.2626.13293.camel@edumazet-glaptop>
-To: David Miller <davem@davemloft.net>
-Cc: netdev <netdev@vger.kernel.org>, Anton Mich <lp2s1h@gmail.com>
-
+From b8fc328668a74e1314a19266755a54abd875e5a6 Mon Sep 17 00:00:00 2001
 From: Eric Dumazet <edumazet@google.com>
+Date: Sun, 29 Jul 2012 20:52:21 +0000
+Subject: [PATCH] codel: refine one condition to avoid a nul rec_inv_sqrt
+
+commit 2359a47671fc4fb0fe5e9945f76c2cb10792c0f8 upstream.
 
 One condition before codel_Newton_step() was not good if
 we never left the dropping state for a flow. As a result
@@ -27,23 +20,14 @@ a fix.
 
 Reported-by: Anton Mich <lp2s1h@gmail.com>
 Signed-off-by: Eric Dumazet <edumazet@google.com>
-
+Signed-off-by: David S. Miller <davem@davemloft.net>
 ---
-include/net/codel.h |    8 ++++++--
+ include/net/codel.h |    8 ++++++--
  1 file changed, 6 insertions(+), 2 deletions(-)
 
-
-
---
-To unsubscribe from this list: send the line "unsubscribe netdev" in
-the body of a message to majordomo@vger.kernel.org
-More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-diff --git a/include/net/codel.h b/include/net/codel.h
-index 550debf..389cf62 100644
 --- a/include/net/codel.h
 +++ b/include/net/codel.h
-@@ -305,6 +305,8 @@ static struct sk_buff *codel_dequeue(struct Qdisc *sch,
+@@ -305,6 +305,8 @@ static struct sk_buff *codel_dequeue(str
  			}
  		}
  	} else if (drop) {
@@ -52,7 +36,7 @@ index 550debf..389cf62 100644
  		if (params->ecn && INET_ECN_set_ce(skb)) {
  			stats->ecn_mark++;
  		} else {
-@@ -320,9 +322,11 @@ static struct sk_buff *codel_dequeue(struct Qdisc *sch,
+@@ -320,9 +322,11 @@ static struct sk_buff *codel_dequeue(str
  		 * assume that the drop rate that controlled the queue on the
  		 * last cycle is a good starting point to control it now.
  		 */

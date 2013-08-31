@@ -33,9 +33,11 @@ else
     PATCH_DIR ?= ./patches$(if $(wildcard ./patches-$(KERNEL_PATCHVER)),-$(KERNEL_PATCHVER))
     FILES_DIR ?= $(foreach dir,$(wildcard ./files ./files-$(KERNEL_PATCHVER)),"$(dir)")
   endif
-  KERNEL_BUILD_DIR ?= $(BUILD_DIR_BASE)/linux-$(BOARD)$(if $(SUBTARGET),_$(SUBTARGET))$(if $(BUILD_SUFFIX),_$(BUILD_SUFFIX))
+  KERNEL_BUILD_DIR ?= $(BUILD_DIR)/linux-$(BOARD)$(if $(SUBTARGET),_$(SUBTARGET))
   LINUX_DIR ?= $(KERNEL_BUILD_DIR)/linux-$(LINUX_VERSION)
-
+  ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),ge,3.7.0)),1)
+    LINUX_UAPI_DIR=uapi/
+  endif
   LINUX_VERMAGIC:=$(strip $(shell cat $(LINUX_DIR)/.vermagic 2>/dev/null))
   LINUX_VERMAGIC:=$(if $(LINUX_VERMAGIC),$(LINUX_VERMAGIC),unknown)
 
@@ -49,14 +51,10 @@ else
 
   LINUX_KERNEL:=$(KERNEL_BUILD_DIR)/vmlinux
 
-  LINUX_SOURCE:=linux-$(LINUX_VERSION).tar.bz2
+  LINUX_SOURCE:=linux-$(LINUX_VERSION).tar.xz
   TESTING:=$(if $(findstring -rc,$(LINUX_VERSION)),/testing,)
   ifeq ($(call qstrip,$(CONFIG_EXTERNAL_KERNEL_TREE))$(call qstrip,$(CONFIG_KERNEL_GIT_CLONE_URI)),)
-    ifeq ($(word 1,$(subst ., ,$(KERNEL_BASE))),3)
       LINUX_SITE:=@KERNEL/linux/kernel/v3.x$(TESTING)
-    else
-      LINUX_SITE:=@KERNEL/linux/kernel/v$(KERNEL)$(TESTING)
-    endif
   endif
 
   ifneq ($(TARGET_BUILD),1)
@@ -106,8 +104,8 @@ define ModuleAutoLoad
 		mkdir -p $(2)/CONTROL; \
 		echo "#!/bin/sh" > $(2)/CONTROL/postinst; \
 		echo "[ -z \"\$$$$$$$$IPKG_INSTROOT\" ] || exit 0" >> $(2)/CONTROL/postinst; \
-		echo ". /etc/functions.sh" >> $(2)/CONTROL/postinst; \
-		echo "load_modules $$$$$$$$modules" >> $(2)/CONTROL/postinst; \
+		echo ". /lib/functions.sh" >> $(2)/CONTROL/postinst; \
+		echo "insert_modules $$$$$$$$modules" >> $(2)/CONTROL/postinst; \
 		chmod 0755 $(2)/CONTROL/postinst; \
 	fi
 endef
@@ -165,11 +163,11 @@ $(call KernelPackage/$(1)/config)
 				if grep -q "$$$$$$$${mod##$(LINUX_DIR)/}" "$(LINUX_DIR)/modules.builtin"; then \
 					echo "NOTICE: module '$$$$$$$$mod' is built-in."; \
 				else \
-					echo "ERROR: module '$$$$$$$$mod' is missing."; \
+					echo "ERROR: module '$$$$$$$$mod' is missing." >&2; \
 					exit 1; \
 				fi; \
 			else \
-				echo "WARNING: module '$$$$$$$$mod' missing and modules.builtin not available, assuming built-in."; \
+				echo "WARNING: module '$$$$$$$$mod' missing and modules.builtin not available, assuming built-in." >&2; \
 			fi; \
 		  done;
 		  $(call ModuleAutoLoad,$(1),$$(1),$(AUTOLOAD))
@@ -180,7 +178,7 @@ $(call KernelPackage/$(1)/config)
     else
       compile: kmod-$(1)-unavailable
       kmod-$(1)-unavailable:
-		@echo "WARNING: kmod-$(1) is not available in the kernel config"
+		@echo "WARNING: kmod-$(1) is not available in the kernel config" >&2
   )
   endif
   $$(eval $$(call BuildPackage,kmod-$(1)))

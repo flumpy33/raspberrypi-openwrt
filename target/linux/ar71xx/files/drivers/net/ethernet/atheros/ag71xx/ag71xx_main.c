@@ -891,7 +891,7 @@ static int ag71xx_rx_packets(struct ag71xx *ag, int limit)
 		dev->stats.rx_packets++;
 		dev->stats.rx_bytes += pktlen;
 
-		skb = build_skb(ring->buf[i].rx_buf);
+		skb = build_skb(ring->buf[i].rx_buf, 0);
 		if (!skb) {
 			kfree(ring->buf[i].rx_buf);
 			goto next;
@@ -1056,7 +1056,28 @@ static const struct net_device_ops ag71xx_netdev_ops = {
 #endif
 };
 
-static int __devinit ag71xx_probe(struct platform_device *pdev)
+static const char *ag71xx_get_phy_if_mode_name(phy_interface_t mode)
+{
+	switch (mode) {
+	case PHY_INTERFACE_MODE_MII:
+		return "MII";
+	case PHY_INTERFACE_MODE_GMII:
+		return "GMII";
+	case PHY_INTERFACE_MODE_RMII:
+		return "RMII";
+	case PHY_INTERFACE_MODE_RGMII:
+		return "RGMII";
+	case PHY_INTERFACE_MODE_SGMII:
+		return "SGMII";
+	default:
+		break;
+	}
+
+	return "unknown";
+}
+
+
+static int ag71xx_probe(struct platform_device *pdev)
 {
 	struct net_device *dev;
 	struct resource *res;
@@ -1071,7 +1092,7 @@ static int __devinit ag71xx_probe(struct platform_device *pdev)
 		goto err_out;
 	}
 
-	if (pdata->mii_bus_dev == NULL) {
+	if (pdata->mii_bus_dev == NULL && pdata->phy_mask) {
 		dev_err(&pdev->dev, "no MII bus device specified\n");
 		err = -EINVAL;
 		goto err_out;
@@ -1149,8 +1170,9 @@ static int __devinit ag71xx_probe(struct platform_device *pdev)
 		goto err_free_desc;
 	}
 
-	pr_info("%s: Atheros AG71xx at 0x%08lx, irq %d\n",
-		dev->name, dev->base_addr, dev->irq);
+	pr_info("%s: Atheros AG71xx at 0x%08lx, irq %d, mode:%s\n",
+		dev->name, dev->base_addr, dev->irq,
+		ag71xx_get_phy_if_mode_name(pdata->phy_if_mode));
 
 	ag71xx_dump_regs(ag);
 
@@ -1188,7 +1210,7 @@ err_out:
 	return err;
 }
 
-static int __devexit ag71xx_remove(struct platform_device *pdev)
+static int ag71xx_remove(struct platform_device *pdev)
 {
 	struct net_device *dev = platform_get_drvdata(pdev);
 
@@ -1209,7 +1231,7 @@ static int __devexit ag71xx_remove(struct platform_device *pdev)
 
 static struct platform_driver ag71xx_driver = {
 	.probe		= ag71xx_probe,
-	.remove		= __exit_p(ag71xx_remove),
+	.remove		= ag71xx_remove,
 	.driver = {
 		.name	= AG71XX_DRV_NAME,
 	}
