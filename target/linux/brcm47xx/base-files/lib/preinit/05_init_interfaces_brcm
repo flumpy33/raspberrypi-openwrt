@@ -4,6 +4,12 @@ set_preinit_iface() {
 	ifname=eth0
 
 	insmod diag
+	insmod hwmon
+	insmod pps_core
+	insmod ptp
+	insmod tg3
+	insmod b44
+	insmod bgmac
 
 	# hardware specific overrides
 	case "$(cat /proc/diag/model)" in
@@ -16,21 +22,13 @@ set_preinit_iface() {
 	ifconfig $ifname 0.0.0.0 up
 }
 
-check_module () {
-  module="$1"; shift; params="$*"
-
-  insmod "$module" "$params"
-  sleep 1
-  grep "^$module" /proc/modules
-  return $?
-}
-
 init_iface() {
-	check_module tg3
-	insmod switch-core
-	check_module switch-robo || check_module switch-adm  || { 
-	  check_module bcm57xx activate_gpio=0x4 && cpu_port="8u*"
-	} || rmmod switch-core
+	[ -d /proc/switch/eth0 ] && [ "$ifname" = "eth0" ] && {
+		case "$(cat /proc/switch/eth0/cpuport)" in
+			"5") cpu_port="5u*";;
+			"8") cpu_port="8u*";;
+		esac
+	}
 }
 
 boot_hook_add preinit_main set_preinit_iface

@@ -15,16 +15,20 @@ tools-y += gmp mpfr mpc libelf
 endif
 tools-y += m4 libtool autoconf automake flex bison pkg-config sed mklibs
 tools-y += sstrip ipkg-utils genext2fs e2fsprogs mtd-utils mkimage
-tools-y += firmware-utils patch-cmdline quilt yaffs2 flock padjffs2
+tools-y += firmware-utils patch-image patch quilt yaffs2 flock padjffs2
 tools-y += mm-macros xorg-macros xfce-macros missing-macros xz cmake scons
 tools-$(CONFIG_TARGET_orion_generic) += wrt350nv2-builder upslug2
 tools-$(CONFIG_powerpc) += upx
 tools-$(CONFIG_TARGET_x86) += qemu
+tools-$(CONFIG_TARGET_imx23) += elftosb
 tools-$(CONFIG_TARGET_brcm2708) += mtools dosfstools
 ifneq ($(CONFIG_TARGET_ar71xx),)
 tools-y += lzma-old squashfs
 endif
 tools-y += lzma squashfs4
+ifneq ($(CONFIG_PACKAGE_kmod-b43)$(CONFIG_PACKAGE_kmod-b43legacy)$(CONFIG_BRCMSMAC_USE_FW_FROM_WL),)
+tools-y += b43-tools
+endif
 
 ifneq ($(CONFIG_PACKAGE_firmwarehotplug),)
 tools-y += sdcc
@@ -39,6 +43,7 @@ endif
 
 # builddir dependencies
 $(curdir)/bison/compile := $(curdir)/flex/install
+$(curdir)/flex/compile := $(curdir)/m4/install
 $(curdir)/pkg-config/compile := $(curdir)/sed/install
 $(curdir)/libtool/compile := $(curdir)/sed/install
 $(curdir)/squashfs/compile := $(curdir)/lzma-old/install
@@ -54,6 +59,7 @@ $(curdir)/ppl/compile := $(curdir)/gmp/install
 $(curdir)/cloog/compile := $(curdir)/ppl/install
 $(curdir)/mtd-utils/compile := $(curdir)/e2fsprogs/install $(curdir)/xz/install
 $(curdir)/mkimage/compile := $(curdir)/sed/install
+$(curdir)/mklibs/compile := $(curdir)/automake/install
 $(curdir)/qemu/compile := $(curdir)/e2fsprogs/install
 $(curdir)/upslug2/compile := $(curdir)/automake/install
 $(curdir)/mm-macros/compile := $(curdir)/automake/install
@@ -63,6 +69,7 @@ $(curdir)/missing-macros/compile := $(curdir)/automake/install
 $(curdir)/e2fsprogs/compile := $(curdir)/automake/install
 $(curdir)/libelf/compile := $(curdir)/automake/install
 $(curdir)/sdcc/compile := $(curdir)/bison/install
+$(curdir)/b43-tools/compile := $(curdir)/bison/install
 
 ifneq ($(CONFIG_CCACHE),)
 $(foreach tool, $(tools-y), $(eval $(curdir)/$(tool)/compile += $(curdir)/ccache/install))
@@ -113,6 +120,8 @@ $(STAGING_DIR_HOST)/bin/stat: $(STAGING_DIR)/.prepared
 		ln -s `which stat` $@; \
 	elif gstat --version > /dev/null 2>&1; then \
 		ln -s `which gstat` $@; \
+	elif gnustat --version > /dev/null 2>&1; then \
+		ln -s `which gnustat` $@; \
 	else \
 		echo "GNU stat not found"; \
 		false; \
@@ -122,9 +131,14 @@ $(eval $(call PrepareCommand,find,gfind find))
 $(eval $(call PrepareCommand,md5sum,gmd5sum md5sum $(SCRIPT_DIR)/md5sum))
 $(eval $(call PrepareCommand,cp,gcp cp))
 $(eval $(call PrepareCommand,seq,gseq seq))
-$(eval $(call PrepareCommand,python,python2 python))
+$(eval $(call PrepareCommand,python,python2 python2.7 python))
+$(eval $(call PrepareCommand,awk,gawk awk))
+$(eval $(call PrepareCommand,getopt,gnugetopt /usr/local/bin/getopt getopt))
+$(eval $(call PrepareCommand,grep,ggrep grep))
+$(eval $(call PrepareCommand,tar,gtar tar))
+$(eval $(call PrepareCommand,diff,gdiff diff))
 
-$(curdir)/cmddeps = $(patsubst %,$(STAGING_DIR_HOST)/bin/%,find md5sum cp stat seq python)
+$(curdir)/cmddeps = $(patsubst %,$(STAGING_DIR_HOST)/bin/%,find md5sum cp stat seq python awk getopt grep tar diff)
 $(curdir)//prepare = $(STAGING_DIR)/.prepared $(STAGING_DIR_HOST)/.prepared $($(curdir)/cmddeps)
 $(curdir)//compile = $(STAGING_DIR)/.prepared $(STAGING_DIR_HOST)/.prepared $($(curdir)/cmddeps)
 

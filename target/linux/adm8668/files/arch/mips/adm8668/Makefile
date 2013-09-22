@@ -2,4 +2,5 @@
 # something witty  --neutronscott
 #
 
-obj-y	 	:= irq.o pci.o prom.o platform.o serial.o proc.o net_core.o net_intr.o
+obj-y	 	:= irq.o prom.o platform.o gpio.o \
+		   setup.o clock.o time.o early_printk.o \

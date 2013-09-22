@@ -13,21 +13,17 @@ BIN_VERSION:=$(PKG_VERSION)
 PKG_SOURCE_URL:=@GNU/binutils/
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
 
-ifeq ($(PKG_VERSION),2.19.1)
-  PKG_MD5SUM:=09a8c5821a2dfdbb20665bc0bd680791
-endif
 ifeq ($(PKG_VERSION),2.20.1)
   PKG_MD5SUM:=9cdfb9d6ec0578c166d3beae5e15c4e5
-endif
-ifeq ($(PKG_VERSION),2.21)
-  PKG_MD5SUM:=c84c5acc9d266f1a7044b51c85a823f5
-endif
-ifeq ($(PKG_VERSION),2.21.1)
-  PKG_MD5SUM:=bde820eac53fa3a8d8696667418557ad
 endif
 ifeq ($(PKG_VERSION),2.22)
   PKG_MD5SUM:=ee0f10756c84979622b992a4a61ea3f5
 endif
+ifeq ($(PKG_VERSION),2.23.1)
+  PKG_MD5SUM:=33adb18c3048d057ac58d07a3f1adb38
+endif
+
+HOST_BUILD_PARALLEL:=1
 
 PATCH_DIR:=./patches/$(PKG_VERSION)
 
@@ -75,7 +71,7 @@ define Host/Configure
 endef
 
 define Host/Compile
-	$(MAKE) $(TOOLCHAIN_JOBS) -C $(HOST_BUILD_DIR) all
+	+$(MAKE) $(HOST_JOBS) -C $(HOST_BUILD_DIR) all
 endef
 
 define Host/Install

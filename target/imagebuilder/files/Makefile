@@ -134,7 +134,7 @@ package_install: FORCE
 copy_files: FORCE
 	@echo
 	@echo Copying extra files
-	$(CP) $(USER_FILES)/* $(TARGET_DIR)/
+	@$(call file_copy,$(USER_FILES)/*,$(TARGET_DIR)/)
 
 package_postinst: FORCE
 	@echo

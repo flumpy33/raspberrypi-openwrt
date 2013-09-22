@@ -2,6 +2,8 @@
 # Copyright (C) 2006 OpenWrt.org
 # Copyright (C) 2010 Vertical Communications
 
+[ -z "$PREINIT" ] && exec /sbin/init
+
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 
 pi_ifname=
@@ -22,7 +24,6 @@ pi_init_path="/bin:/sbin:/usr/bin:/usr/sbin"
 pi_init_cmd="/sbin/init"
 
 . /lib/functions.sh
-. /lib/functions/boot.sh
 
 boot_hook_init preinit_essential
 boot_hook_init preinit_main

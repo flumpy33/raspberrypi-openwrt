@@ -2,7 +2,7 @@
 #
 #   Empty/wrong machtype-workaround generator
 #
-#   Copyright (C) 2006 Imre Kaloz <kaloz@openwrt.org>
+#   Copyright (C) 2006-2012 Imre Kaloz <kaloz@openwrt.org>
 #   based on linux/arch/arm/boot/compressed/head-xscale.S
 #
 #   This program is free software; you can redistribute it and/or modify
@@ -22,7 +22,7 @@
 # NOTE: for now it's for only IXP4xx in big endian mode
 
 # list of supported boards, in "boardname machtypeid" format
-for board in "avila 526" "gateway7001 731" "nslu2 597" "nas100d 865" "wg302v1 889" "wg302v2 890" "pronghorn 928" "pronghornmetro 1040" "compex 1273" "wrt300nv2 1077" "loft 849" "dsmg600 964" "fsg3 1091" "ap1000 1543" "tw2662 1658" "tw5334 1664" "ixdpg425 604" "cambria 1468" "sidewinder 1041"
+for board in "avila 526" "gateway7001 731" "nslu2 597" "nas100d 865" "wg302v1 889" "wg302v2 890" "pronghorn 928" "pronghornmetro 1040" "compex 1273" "wrt300nv2 1077" "loft 849" "dsmg600 964" "fsg3 1091" "ap1000 1543" "tw2662 1658" "tw5334 1664" "ixdpg425 604" "cambria 1468" "sidewinder 1041" "ap42x 4418"
 do
   set -- $board
   hexid=$(printf %x\\n $2)
@@ -31,7 +31,11 @@ do
     printf "\xe3\xa0\x10\x$hexid" > $BIN_DIR/openwrt-$1-zImage
   else
     # we have a high machtypeid, we need a "mov" (e3a) and an "orr" (e38)
-    printf "\xe3\xa0\x10\x$(echo $hexid|cut -b "2 3")\xe3\x81\x1c\x$(echo $hexid|cut -b 1)" > $BIN_DIR/openwrt-$1-zImage
+    if [ "$2" -lt "4096" ]; then
+      printf "\xe3\xa0\x10\x$(echo $hexid|cut -b "2 3")\xe3\x81\x1c\x$(echo $hexid|cut -b 1)" > $BIN_DIR/openwrt-$1-zImage
+    else
+      printf "\xe3\xa0\x10\x$(echo $hexid|cut -b "3 4")\xe3\x81\x1c\x$(echo $hexid|cut -b "1 2")" > $BIN_DIR/openwrt-$1-zImage
+    fi
   fi
     # generate the image
     cat $BIN_DIR/$IMG_PREFIX-zImage >> $BIN_DIR/openwrt-$1-zImage

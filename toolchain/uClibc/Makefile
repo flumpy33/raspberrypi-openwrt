@@ -5,6 +5,8 @@ include ./common.mk
 HOST_STAMP_BUILT:=$(HOST_BUILD_DIR)/.built
 HOST_STAMP_INSTALLED:=$(TOOLCHAIN_DIR)/stamp/.uclibc_installed
 
+HOST_BUILD_PARALLEL:=1
+
 define Host/SetToolchainInfo
 	$(SED) 's,^\(LIBC_TYPE\)=.*,\1=$(PKG_NAME),' $(TOOLCHAIN_DIR)/info.mk
 	$(SED) 's,^\(LIBC_URL\)=.*,\1=http://www.uclibc.org/,' $(TOOLCHAIN_DIR)/info.mk
@@ -14,7 +16,7 @@ endef
 
 define Host/Compile
 	$(SED) 's,^CROSS=.*,CROSS=$(TARGET_CROSS),g' $(HOST_BUILD_DIR)/Rules.mak
-	$(UCLIBC_MAKE) $(TOOLCHAIN_JOBS) PREFIX= all
+	$(UCLIBC_MAKE) PREFIX= all
 endef
 
 define Host/Install

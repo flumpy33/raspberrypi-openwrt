@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008-2012 OpenWrt.org
+# Copyright (C) 2008-2013 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -17,24 +17,13 @@
 KERNEL_MTD_SIZE:=1024
 
 # Netgear WNR854T: erase size is 128KiB = 0x00020000 = 131072
-ERASE_SIZE_WNR854T:=128
-UIMAGE_FILE_NAME_WNR854T:=uImage
+ERASE_SIZE_128K:=128
 
 # Linksys WRT350N v2: erase size is 64KiB = 0x00010000 = 65536
-ERASE_SIZE_WRT350Nv2:=64
+ERASE_SIZE_64K:=64
 
 # define JFFS2 sizes for include/image.mk
 JFFS2_BLOCKSIZE:=64k 128k
-
-
-###
-### Image/Prepare
-###
-
-define Image/Prepare
-### Dummy comment for indented calls of Image/Prepare
-	cp '$(LINUX_DIR)/arch/arm/boot/zImage' '$(BIN_DIR)/$(IMG_PREFIX)-zImage'
-endef
 
 
 ###
@@ -44,17 +33,37 @@ endef
 define Image/BuildKernel
 ### Dummy comment for indented calls of Image/BuildKernel
 
+ ## Netgear WN802T: mach id 3306 (0x0cea)
+$(call Image/BuildKernel/ARM/zImage,wn802t,"\x0c\x1c\xa0\xe3\xea\x10\x81\xe3")
+$(call Image/BuildKernel/ARM/uImage,wn802t)
+ifeq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),y)
+$(call Image/BuildKernel/ARM/zImage,wn802t,"\x0c\x1c\xa0\xe3\xea\x10\x81\xe3",-initramfs)
+$(call Image/BuildKernel/ARM/uImage,wn802t,-initramfs)
+endif
+ ifneq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),y)  # nothing more to do for a ramdisk build
+$(call Image/BuildKernel/JFFS2uImage,wn802t,$(ERASE_SIZE_64K),uImage)
+$(call Image/Default/FileSizeCheck,$(KDIR)/wn802t-uImage.jffs2,$(shell expr $(KERNEL_MTD_SIZE) \* 1024))
+ endif
+
  ## Netgear WNR854T: mach id 1801 (0x0709)
 $(call Image/BuildKernel/ARM/zImage,wnr854t,"\x07\x1c\xa0\xe3\x09\x10\x81\xe3")
 $(call Image/BuildKernel/ARM/uImage,wnr854t)
+ifeq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),y)
+$(call Image/BuildKernel/ARM/zImage,wnr854t,"\x07\x1c\xa0\xe3\x09\x10\x81\xe3",-initramfs)
+$(call Image/BuildKernel/ARM/uImage,wnr854t,-initramfs)
+endif
  ifneq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),y)  # nothing more to do for a ramdisk build
-$(call Image/BuildKernel/JFFS2uImage,wnr854t,$(ERASE_SIZE_WNR854T),$(UIMAGE_FILE_NAME_WNR854T))
+$(call Image/BuildKernel/JFFS2uImage,wnr854t,$(ERASE_SIZE_128K),uImage)
 $(call Image/Default/FileSizeCheck,$(KDIR)/wnr854t-uImage.jffs2,$(shell expr $(KERNEL_MTD_SIZE) \* 1024))
  endif
 
  ## Linksys WRT350N v2: mach id 1633 (0x0661)
 $(call Image/BuildKernel/ARM/zImage,wrt350nv2,"\x06\x1c\xa0\xe3\x61\x10\x81\xe3")
 $(call Image/BuildKernel/ARM/uImage,wrt350nv2)
+ifeq ($($CONFIG_TARGET_ROOTFS_INITRAMFS),y)
+$(call Image/BuildKernel/ARM/zImage,wrt350nv2,"\x06\x1c\xa0\xe3\x61\x10\x81\xe3",-initramfs)
+$(call Image/BuildKernel/ARM/uImage,wrt350nv2-initramfs)
+endif
  ifneq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),y)  # nothing more to do for a ramdisk build
 $(call Image/Default/FileSizeCheck,$(KDIR)/wrt350nv2-uImage,$(shell expr $(KERNEL_MTD_SIZE) \* 1024))
  endif
@@ -64,9 +73,8 @@ define Image/BuildKernel/ARM/zImage
  # merge machine id and regular zImage into one file
  # parameters: 1 = machine name, 2 = machine id as string in quotes
 	# $(BOARD) kernel zImage for $(1)
-	echo -en $(2) > '$(KDIR)/$(1)-zImage'
-	cat '$(LINUX_DIR)/arch/arm/boot/zImage' >> '$(KDIR)/$(1)-zImage'
-	cp '$(KDIR)/$(1)-zImage' '$(BIN_DIR)/openwrt-$(1)-zImage'
+	echo -en $(2) > '$(KDIR)/$(1)-zImage$(3)'
+	cat '$(KDIR)/zImage$(3)' >> '$(KDIR)/$(1)-zImage$(3)'
 endef
 
 define Image/BuildKernel/ARM/uImage
@@ -76,7 +84,9 @@ define Image/BuildKernel/ARM/uImage
 	'$(STAGING_DIR_HOST)/bin/mkimage' -A arm -O linux -T kernel \
 	-C none -a 0x00008000 -e 0x00008000 -n 'Linux-$(LINUX_VERSION)' \
 	-d '$(KDIR)/$(1)-zImage' '$(KDIR)/$(1)-uImage'
-	cp '$(KDIR)/$(1)-uImage' '$(BIN_DIR)/openwrt-$(1)-uImage'
+ ifeq ($(2),-initramfs) # only copy uImage for ramdisk build
+	cp '$(KDIR)/$(1)-uImage-initramfs' '$(BIN_DIR)/openwrt-$(1)-uImage-initramfs'
+ endif
 endef
 
 define Image/BuildKernel/JFFS2uImage
@@ -106,16 +116,18 @@ define Image/Build
  ## Prepare rootfs
 $(call Image/Build/$(1),$(1))
 
+ ## Netgear WN802T
+$(call Image/Build/Default,$(1),wn802t,$(ERASE_SIZE_64K),$(KERNEL_MTD_SIZE),.jffs2,NG_WN802T)
+
  ## Netgear WNR854T
-$(call Image/Build/Default,$(1),wnr854t,$(ERASE_SIZE_WNR854T),$(KERNEL_MTD_SIZE),.jffs2,NG_WNR854T)
+$(call Image/Build/Default,$(1),wnr854t,$(ERASE_SIZE_128K),$(KERNEL_MTD_SIZE),.jffs2,NG_WNR854T)
 
  ## Linksys WRT350N v2
-$(call Image/Build/Linksys/wrt350nv2,$(1),wrt350nv2,$(ERASE_SIZE_WRT350Nv2),$(KERNEL_MTD_SIZE),)
+$(call Image/Build/Linksys/wrt350nv2,$(1),wrt350nv2,$(ERASE_SIZE_64K),$(KERNEL_MTD_SIZE),)
 endef
 
 define Image/Build/squashfs
 $(call prepare_generic_squashfs,$(KDIR)/root.squashfs)
-	cp '$(KDIR)/root.squashfs' '$(BIN_DIR)/$(IMG_PREFIX)-root.squashfs'
 endef
 
 ## generate defines for all JFFS2 block sizes
