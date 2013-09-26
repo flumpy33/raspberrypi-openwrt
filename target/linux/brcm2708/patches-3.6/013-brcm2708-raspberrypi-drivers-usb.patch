@@ -36445,7 +36445,7 @@
 +#endif /* DWC_DEVICE_ONLY */
 --- /dev/null
 +++ b/drivers/usb/host/dwc_otg/dwc_otg_hcd_intr.c
-@@ -0,0 +1,2742 @@
+@@ -0,0 +1,2741 @@
 +/* ==========================================================================
 + * $File: //dwh/usb_iip/dev/software/otg/linux/drivers/dwc_otg_hcd_intr.c $
 + * $Revision: #89 $
@@ -37190,8 +37190,8 @@
 +	}
 +
 +	/* Clear interrupt */
-+	//gintsts.b.sofintr = 1;
-+	//DWC_WRITE_REG32(&hcd->core_if->core_global_regs->gintsts, gintsts.d32);
++	gintsts.b.sofintr = 1;
++	DWC_WRITE_REG32(&hcd->core_if->core_global_regs->gintsts, gintsts.d32);
 +
 +	return 1;
 +}
@@ -38305,8 +38305,7 @@
 +	 */
 +	switch(dwc_otg_hcd_get_pipe_type(&qtd->urb->pipe_info)) {
 +		case UE_BULK:
-+		//case UE_INTERRUPT:
-+		//case UE_CONTROL:
++		case UE_CONTROL:
 +		if (nak_holdoff_enable)
 +			hc->qh->nak_frame = dwc_otg_hcd_get_frame_number(hcd);
 +	}
