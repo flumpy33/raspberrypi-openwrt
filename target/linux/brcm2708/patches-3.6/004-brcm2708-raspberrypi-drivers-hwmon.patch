@@ -1,6 +1,6 @@
 --- a/drivers/hwmon/Kconfig
 +++ b/drivers/hwmon/Kconfig
-@@ -1411,6 +1411,16 @@ config SENSORS_MC13783_ADC
+@@ -1420,6 +1420,16 @@ config SENSORS_MC13783_ADC
          help
            Support for the A/D converter on MC13783 and MC13892 PMIC.
  
@@ -19,10 +19,10 @@
  comment "ACPI drivers"
 --- a/drivers/hwmon/Makefile
 +++ b/drivers/hwmon/Makefile
-@@ -129,6 +129,7 @@ obj-$(CONFIG_SENSORS_W83L785TS)	+= w83l785ts.o
- obj-$(CONFIG_SENSORS_W83L786NG)	+= w83l786ng.o
+@@ -130,6 +130,7 @@ obj-$(CONFIG_SENSORS_W83L786NG)	+= w83l7
  obj-$(CONFIG_SENSORS_WM831X)	+= wm831x-hwmon.o
  obj-$(CONFIG_SENSORS_WM8350)	+= wm8350-hwmon.o
+ obj-$(CONFIG_SENSORS_GSC)	+= gsc.o
 +obj-$(CONFIG_SENSORS_BCM2835)	+= bcm2835-hwmon.o
  
  obj-$(CONFIG_PMBUS)		+= pmbus/
