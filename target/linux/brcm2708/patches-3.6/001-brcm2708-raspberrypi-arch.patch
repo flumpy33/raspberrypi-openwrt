@@ -1,7 +1,67 @@
-unchanged:
---- a/arch/arm/boot/compressed/decompress.c	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/boot/compressed/decompress.c	2013-06-30 10:27:26.982569229 +0200
-@@ -32,6 +32,9 @@
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -999,6 +999,23 @@ config PLAT_SPEAR
+ 	help
+ 	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
+ 
++config ARCH_BCM2708
++	bool "Broadcom BCM2708 family"
++	select CPU_V6
++	select ARM_AMBA
++	select HAVE_CLK
++	select HAVE_SCHED_CLOCK
++	select NEED_MACH_MEMORY_H
++	select CLKDEV_LOOKUP
++	select ARCH_HAS_CPUFREQ
++	select GENERIC_CLOCKEVENTS
++	select ARM_ERRATA_411920
++	select MACH_BCM2708
++	select VC4
++	select FIQ
++	help
++	  This enables support for Broadcom BCM2708 boards.
++
+ config ARCH_VT8500
+ 	bool "VIA/WonderMedia 85xx"
+ 	select CPU_ARM926T
+@@ -1133,6 +1150,7 @@ source "arch/arm/plat-versatile/Kconfig"
+ source "arch/arm/mach-vt8500/Kconfig"
+ 
+ source "arch/arm/mach-w90x900/Kconfig"
++source "arch/arm/mach-bcm2708/Kconfig"
+ 
+ # Definitions to make life easier
+ config ARCH_ACORN
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -371,6 +371,14 @@ choice
+ 		  For more details about semihosting, please see
+ 		  chapter 8 of DUI0203I_rvct_developer_guide.pdf from ARM Ltd.
+ 
++	config DEBUG_BCM2708_UART0
++		bool "Broadcom BCM2708 UART0 (PL011)"
++		depends on MACH_BCM2708
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART 0. The port must have been initialised
++		  by the boot-loader before use.
++
+ endchoice
+ 
+ config EARLY_PRINTK
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -198,6 +198,7 @@ machine-$(CONFIG_MACH_SPEAR310)		:= spear3xx
+ machine-$(CONFIG_MACH_SPEAR320)		:= spear3xx
+ machine-$(CONFIG_MACH_SPEAR600)		:= spear6xx
+ machine-$(CONFIG_ARCH_ZYNQ)		:= zynq
++machine-$(CONFIG_ARCH_BCM2708)		:= bcm2708
+ 
+ # Platform directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -32,6 +32,9 @@ extern void error(char *);
  #  define Tracecv(c,x)
  #endif
  
@@ -11,9 +71,8 @@ unchanged:
  #ifdef CONFIG_KERNEL_GZIP
  #include "../../../../lib/decompress_inflate.c"
  #endif
-unchanged:
---- a/arch/arm/configs/bcmrpi_cutdown_defconfig	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/configs/bcmrpi_cutdown_defconfig	2013-06-30 10:27:27.054569229 +0200
+--- /dev/null
++++ b/arch/arm/configs/bcmrpi_cutdown_defconfig
 @@ -0,0 +1,546 @@
 +CONFIG_EXPERIMENTAL=y
 +CONFIG_LOCALVERSION="-cutdown"
@@ -561,10 +620,9 @@ unchanged:
 +# CONFIG_CRYPTO_HW is not set
 +CONFIG_CRC_ITU_T=y
 +CONFIG_LIBCRC32C=y
-unchanged:
---- a/arch/arm/configs/bcmrpi_defconfig	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/configs/bcmrpi_defconfig	2013-06-30 10:27:27.058569229 +0200
-@@ -0,0 +1,1023 @@
+--- /dev/null
++++ b/arch/arm/configs/bcmrpi_defconfig
+@@ -0,0 +1,1029 @@
 +# CONFIG_ARM_PATCH_PHYS_VIRT is not set
 +CONFIG_EXPERIMENTAL=y
 +# CONFIG_LOCALVERSION_AUTO is not set
@@ -592,10 +650,10 @@ unchanged:
 +CONFIG_RELAY=y
 +CONFIG_EMBEDDED=y
 +# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
 +CONFIG_PROFILING=y
 +CONFIG_OPROFILE=m
 +CONFIG_KPROBES=y
++CONFIG_JUMP_LABEL=y
 +CONFIG_MODULES=y
 +CONFIG_MODULE_UNLOAD=y
 +CONFIG_MODVERSIONS=y
@@ -609,6 +667,7 @@ unchanged:
 +CONFIG_BCM2708_DMAER=m
 +CONFIG_PREEMPT=y
 +CONFIG_AEABI=y
++CONFIG_COMPACTION=y
 +CONFIG_CLEANCACHE=y
 +CONFIG_FRONTSWAP=y
 +CONFIG_UACCESS_WITH_MEMCPY=y
@@ -620,6 +679,7 @@ unchanged:
 +CONFIG_KEXEC=y
 +CONFIG_CPU_FREQ=y
 +CONFIG_CPU_FREQ_STAT=m
++CONFIG_CPU_FREQ_STAT_DETAILS=y
 +CONFIG_CPU_FREQ_DEFAULT_GOV_POWERSAVE=y
 +CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
 +CONFIG_CPU_FREQ_GOV_USERSPACE=y
@@ -820,7 +880,6 @@ unchanged:
 +CONFIG_BRIDGE_EBT_LOG=m
 +CONFIG_BRIDGE_EBT_ULOG=m
 +CONFIG_BRIDGE_EBT_NFLOG=m
-+CONFIG_IP_SCTP=m
 +CONFIG_SCTP_HMAC_SHA1=y
 +CONFIG_L2TP=m
 +CONFIG_BRIDGE=m
@@ -957,6 +1016,7 @@ unchanged:
 +CONFIG_DM_DELAY=m
 +CONFIG_NETDEVICES=y
 +CONFIG_BONDING=m
++CONFIG_DUMMY=m
 +CONFIG_MACVLAN=m
 +CONFIG_NETCONSOLE=m
 +CONFIG_TUN=m
@@ -1394,6 +1454,7 @@ unchanged:
 +CONFIG_USB_ISIGHTFW=m
 +CONFIG_USB_YUREX=m
 +CONFIG_MMC=y
++CONFIG_MMC_BLOCK_MINORS=32
 +CONFIG_MMC_SDHCI=y
 +CONFIG_MMC_SDHCI_PLTFM=y
 +CONFIG_MMC_SDHCI_BCM2708=y
@@ -1477,6 +1538,8 @@ unchanged:
 +CONFIG_BTRFS_FS_POSIX_ACL=y
 +CONFIG_NILFS2_FS=m
 +CONFIG_FANOTIFY=y
++CONFIG_QFMT_V1=m
++CONFIG_QFMT_V2=m
 +CONFIG_AUTOFS4_FS=y
 +CONFIG_FUSE_FS=m
 +CONFIG_CUSE=m
@@ -1555,6 +1618,7 @@ unchanged:
 +CONFIG_NLS_ISO8859_15=m
 +CONFIG_NLS_KOI8_R=m
 +CONFIG_NLS_KOI8_U=m
++CONFIG_DLM=m
 +CONFIG_PRINTK_TIME=y
 +CONFIG_DEBUG_FS=y
 +CONFIG_DETECT_HUNG_TASK=y
@@ -1588,9 +1652,8 @@ unchanged:
 +# CONFIG_CRYPTO_HW is not set
 +CONFIG_CRC_ITU_T=y
 +CONFIG_LIBCRC32C=y
-unchanged:
---- a/arch/arm/configs/bcmrpi_emergency_defconfig	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/configs/bcmrpi_emergency_defconfig	2013-06-30 10:27:27.058569229 +0200
+--- /dev/null
++++ b/arch/arm/configs/bcmrpi_emergency_defconfig
 @@ -0,0 +1,532 @@
 +CONFIG_EXPERIMENTAL=y
 +# CONFIG_LOCALVERSION_AUTO is not set
@@ -2124,9 +2187,8 @@ unchanged:
 +# CONFIG_CRYPTO_HW is not set
 +CONFIG_CRC_ITU_T=y
 +CONFIG_LIBCRC32C=y
-unchanged:
---- a/arch/arm/configs/bcmrpi_quick_defconfig	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/configs/bcmrpi_quick_defconfig	2013-06-30 10:27:27.058569229 +0200
+--- /dev/null
++++ b/arch/arm/configs/bcmrpi_quick_defconfig
 @@ -0,0 +1,197 @@
 +# CONFIG_ARM_PATCH_PHYS_VIRT is not set
 +CONFIG_LOCALVERSION="-quick"
@@ -2325,10 +2387,9 @@ unchanged:
 +# CONFIG_CRYPTO_HW is not set
 +CONFIG_CRC_ITU_T=y
 +CONFIG_LIBCRC32C=y
-unchanged:
---- a/arch/arm/include/asm/fiq.h	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/include/asm/fiq.h	2013-06-30 10:27:27.190569228 +0200
-@@ -42,6 +42,7 @@
+--- a/arch/arm/include/asm/fiq.h
++++ b/arch/arm/include/asm/fiq.h
+@@ -42,6 +42,7 @@ extern void disable_fiq(int fiq);
  /* helpers defined in fiqasm.S: */
  extern void __set_fiq_regs(unsigned long const *regs);
  extern void __get_fiq_regs(unsigned long *regs);
@@ -2336,74 +2397,9 @@ unchanged:
  
  static inline void set_fiq_regs(struct pt_regs const *regs)
  {
-unchanged:
---- a/arch/arm/Kconfig	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/Kconfig	2013-06-30 10:27:26.982569229 +0200
-@@ -999,6 +999,23 @@
- 	help
- 	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
- 
-+config ARCH_BCM2708
-+	bool "Broadcom BCM2708 family"
-+	select CPU_V6
-+	select ARM_AMBA
-+	select HAVE_CLK
-+	select HAVE_SCHED_CLOCK
-+	select NEED_MACH_MEMORY_H
-+	select CLKDEV_LOOKUP
-+	select ARCH_HAS_CPUFREQ
-+	select GENERIC_CLOCKEVENTS
-+	select ARM_ERRATA_411920
-+	select MACH_BCM2708
-+	select VC4
-+	select FIQ
-+	help
-+	  This enables support for Broadcom BCM2708 boards.
-+
- config ARCH_VT8500
- 	bool "VIA/WonderMedia 85xx"
- 	select CPU_ARM926T
-@@ -1133,6 +1150,7 @@
- source "arch/arm/mach-vt8500/Kconfig"
- 
- source "arch/arm/mach-w90x900/Kconfig"
-+source "arch/arm/mach-bcm2708/Kconfig"
- 
- # Definitions to make life easier
- config ARCH_ACORN
-unchanged:
---- a/arch/arm/Kconfig.debug	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/Kconfig.debug	2013-06-30 10:27:26.982569229 +0200
-@@ -371,6 +371,14 @@
- 		  For more details about semihosting, please see
- 		  chapter 8 of DUI0203I_rvct_developer_guide.pdf from ARM Ltd.
- 
-+	config DEBUG_BCM2708_UART0
-+		bool "Broadcom BCM2708 UART0 (PL011)"
-+		depends on MACH_BCM2708
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART 0. The port must have been initialised
-+		  by the boot-loader before use.
-+
- endchoice
- 
- config EARLY_PRINTK
-unchanged:
---- a/arch/arm/kernel/fiqasm.S	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/kernel/fiqasm.S	2013-06-30 10:27:27.434569226 +0200
-@@ -47,3 +47,7 @@
- 	mov	r0, r0		@ avoid hazard prior to ARMv4
- 	mov	pc, lr
- ENDPROC(__get_fiq_regs)
-+
-+ENTRY(__FIQ_Branch)
-+	mov pc, r8
-+ENDPROC(__FIQ_Branch)
-unchanged:
---- a/arch/arm/kernel/fiq.c	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/kernel/fiq.c	2013-06-30 10:27:27.434569226 +0200
-@@ -137,6 +137,7 @@
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -137,6 +137,7 @@ void disable_fiq(int fiq)
  EXPORT_SYMBOL(set_fiq_handler);
  EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
  EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
@@ -2411,9 +2407,29 @@ unchanged:
  EXPORT_SYMBOL(claim_fiq);
  EXPORT_SYMBOL(release_fiq);
  EXPORT_SYMBOL(enable_fiq);
-unchanged:
---- a/arch/arm/lib/memset.S	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/lib/memset.S	2013-06-30 10:27:27.462569226 +0200
+--- a/arch/arm/kernel/fiqasm.S
++++ b/arch/arm/kernel/fiqasm.S
+@@ -47,3 +47,7 @@ ENTRY(__get_fiq_regs)
+ 	mov	r0, r0		@ avoid hazard prior to ARMv4
+ 	mov	pc, lr
+ ENDPROC(__get_fiq_regs)
++
++ENTRY(__FIQ_Branch)
++	mov pc, r8
++ENDPROC(__FIQ_Branch)
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -227,7 +227,7 @@ void cpu_idle(void)
+ 	}
+ }
+ 
+-static char reboot_mode = 'h';
++char reboot_mode = 'h';
+ 
+ int __init reboot_setup(char *str)
+ {
+--- a/arch/arm/lib/memset.S
++++ b/arch/arm/lib/memset.S
 @@ -14,27 +14,15 @@
  
  	.text
@@ -2446,7 +2462,7 @@ unchanged:
  	orr	r1, r1, r1, lsl #16
  	mov	r3, r1
  	cmp	r2, #16
-@@ -43,29 +31,28 @@
+@@ -43,29 +31,28 @@ ENTRY(memset)
  #if ! CALGN(1)+0
  
  /*
@@ -2488,7 +2504,7 @@ unchanged:
  
  #else
  
-@@ -74,54 +61,63 @@
+@@ -74,54 +61,63 @@ ENTRY(memset)
   * whole cache lines at once.
   */
  
@@ -2575,9 +2591,79 @@ unchanged:
 +	add	r2, r2, r3		@ 1 (r2 = r2 - (4 - r3))
 +	b	1b
  ENDPROC(memset)
-unchanged:
---- a/arch/arm/mach-bcm2708/armctrl.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/armctrl.c	2013-06-30 10:27:27.694569226 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/Kconfig
+@@ -0,0 +1,48 @@
++menu "Broadcom BCM2708 Implementations"
++	depends on ARCH_BCM2708
++
++config MACH_BCM2708
++	bool "Broadcom BCM2708 Development Platform"
++	select NEED_MACH_MEMORY_H
++	select NEED_MACH_IO_H
++	select CPU_V6
++	help
++	  Include support for the Broadcom(R) BCM2708 platform.
++
++config BCM2708_GPIO
++	bool "BCM2708 gpio support"
++	depends on MACH_BCM2708
++	select ARCH_REQUIRE_GPIOLIB
++        default y
++	help
++	  Include support for the Broadcom(R) BCM2708 gpio.
++
++config BCM2708_VCMEM
++	bool "Videocore Memory"
++	depends on MACH_BCM2708
++        default y
++        help
++          Helper for videocore memory access and total size allocation.	   
++
++config BCM2708_NOL2CACHE
++	bool "Videocore L2 cache disable"
++	depends on MACH_BCM2708
++        default n
++        help
++          Do not allow ARM to use GPU's L2 cache. Requires disable_l2cache in config.txt.
++
++config BCM2708_DMAER
++	tristate "BCM2708 DMA helper"
++	depends on MACH_BCM2708
++        default n
++        help
++          Enable DMA helper for accelerating X composition
++
++config BCM2708_SPIDEV
++	bool "Bind spidev to SPI0 master"
++	depends on MACH_BCM2708  
++	depends on SPI
++        default y
++		help 
++			Binds spidev driver to the SPI0 master  
++endmenu
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/Makefile
+@@ -0,0 +1,11 @@
++#
++# Makefile for the linux kernel.
++#
++
++obj-$(CONFIG_MACH_BCM2708) 	+= clock.o bcm2708.o armctrl.o vcio.o power.o dma.o delay.o
++obj-$(CONFIG_BCM2708_GPIO)	+= bcm2708_gpio.o
++obj-$(CONFIG_BCM2708_VCMEM)	+= vc_mem.o
++
++obj-$(CONFIG_BCM2708_DMAER)	+= dmaer_master.o
++dmaer_master-objs		:= dmaer.o vc_support.o
++
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/Makefile.boot
+@@ -0,0 +1,3 @@
++   zreladdr-y	:= 0x00008000
++params_phys-y	:= 0x00000100
++initrd_phys-y	:= 0x00800000
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/armctrl.c
 @@ -0,0 +1,227 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/armctrl.c
@@ -2806,9 +2892,8 @@ unchanged:
 +	init_FIQ(FIQ_START);
 +	return 0;
 +}
-unchanged:
---- a/arch/arm/mach-bcm2708/armctrl.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/armctrl.h	2013-06-30 10:27:27.694569226 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/armctrl.h
 @@ -0,0 +1,27 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/armctrl.h
@@ -2837,10 +2922,9 @@ unchanged:
 +			       u32 armctrl_sources, u32 resume_sources);
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/bcm2708.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/bcm2708.c	2013-06-30 10:27:27.694569226 +0200
-@@ -0,0 +1,956 @@
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/bcm2708.c
+@@ -0,0 +1,988 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/bcm2708.c
 + *
@@ -2926,6 +3010,7 @@ unchanged:
 +/* command line parameters */
 +static unsigned boardrev, serial;
 +static unsigned uart_clock;
++static unsigned reboot_part = 0;
 +
 +static void __init bcm2708_init_led(void);
 +
@@ -3505,19 +3590,41 @@ unchanged:
 +	return ret;
 +}
 +
++int calc_rsts(int partition)
++{
++	return PM_PASSWORD |
++		((partition & (1 << 0))  << 0) |
++		((partition & (1 << 1))  << 1) |
++		((partition & (1 << 2))  << 2) |
++		((partition & (1 << 3))  << 3) |
++		((partition & (1 << 4))  << 4) |
++		((partition & (1 << 5))  << 5);
++}
++
 +static void bcm2708_restart(char mode, const char *cmd)
 +{
 +	uint32_t pm_rstc, pm_wdog;
 +	uint32_t timeout = 10;
++	uint32_t pm_rsts = 0;
 +
-+	/* For quick reset notification add reboot=q to cmdline
-+	 */
 +	if(mode == 'q')
 +	{
-+		uint32_t pm_rsts = readl(__io_address(PM_RSTS));
++		// NOOBS < 1.3 booting with reboot=q
++		pm_rsts = readl(__io_address(PM_RSTS));
 +		pm_rsts = PM_PASSWORD | pm_rsts | PM_RSTS_HADWRQ_SET;
-+		writel(pm_rsts, __io_address(PM_RSTS));
 +	}
++	else if(mode == 'p')
++	{
++		// NOOBS < 1.3 halting
++		pm_rsts = readl(__io_address(PM_RSTS));
++		pm_rsts = PM_PASSWORD | pm_rsts | PM_RSTS_HADWRH_SET;
++	}
++	else
++	{
++		pm_rsts = calc_rsts(reboot_part);
++	}
++
++	writel(pm_rsts, __io_address(PM_RSTS));
 +
 +	/* Setup watchdog for reset */
 +	pm_rstc = readl(IO_ADDRESS(PM_RSTC));
@@ -3532,12 +3639,20 @@ unchanged:
 +/* We can't really power off, but if we do the normal reset scheme, and indicate to bootcode.bin not to reboot, then most of the chip will be powered off */
 +static void bcm2708_power_off(void)
 +{
-+	/* we set the watchdog hard reset bit here to distinguish this reset from the normal (full) reset. bootcode.bin will not reboot after a hard reset */
-+	uint32_t pm_rsts = readl(IO_ADDRESS(PM_RSTS));
-+	pm_rsts = PM_PASSWORD | (pm_rsts & PM_RSTC_WRCFG_CLR) | PM_RSTS_HADWRH_SET;
-+	writel(pm_rsts, IO_ADDRESS(PM_RSTS));
-+	/* continue with normal reset mechanism */
-+	bcm2708_restart(0, "");
++	extern char reboot_mode;
++
++	if(reboot_mode == 'q')
++	{
++		// NOOBS < v1.3
++		bcm2708_restart('p', "");
++	}
++	else
++	{
++		/* partition 63 is special code for HALT the bootloader knows not to boot*/
++		reboot_part = 63;
++		/* continue with normal reset mechanism */
++		bcm2708_restart(0, "");
++	}
 +}
 +
 +void __init bcm2708_init(void)
@@ -3797,9 +3912,63 @@ unchanged:
 +module_param(boardrev, uint, 0644);
 +module_param(serial, uint, 0644);
 +module_param(uart_clock, uint, 0644);
-unchanged:
---- a/arch/arm/mach-bcm2708/bcm2708_gpio.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/bcm2708_gpio.c	2013-06-30 10:27:27.694569226 +0200
++module_param(reboot_part, uint, 0644);
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/bcm2708.h
+@@ -0,0 +1,51 @@
++/*
++ * linux/arch/arm/mach-bcm2708/bcm2708.h
++ *
++ * BCM2708 machine support header
++ *
++ *  Copyright (C) 2010 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifndef __BCM2708_BCM2708_H
++#define __BCM2708_BCM2708_H
++
++#include <linux/amba/bus.h>
++
++extern void __init bcm2708_init(void);
++extern void __init bcm2708_init_irq(void);
++extern void __init bcm2708_map_io(void);
++extern struct sys_timer bcm2708_timer;
++extern unsigned int mmc_status(struct device *dev);
++
++#define AMBA_DEVICE(name, busid, base, plat)			\
++static struct amba_device name##_device = {			\
++	.dev		= {					\
++		.coherent_dma_mask = ~0,			\
++		.init_name = busid,				\
++		.platform_data = plat,				\
++	},							\
++	.res		= {					\
++		.start	= base##_BASE,		\
++		.end	= (base##_BASE) + SZ_4K - 1,\
++		.flags	= IORESOURCE_MEM,			\
++	},							\
++	.dma_mask	= ~0,					\
++	.irq		= base##_IRQ,				\
++	/* .dma		= base##_DMA,*/				\
++}
++
++#endif
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/bcm2708_gpio.c
 @@ -0,0 +1,341 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/bcm2708_gpio.c
@@ -4142,64 +4311,8 @@ unchanged:
 +
 +MODULE_DESCRIPTION("Broadcom BCM2708 GPIO driver");
 +MODULE_LICENSE("GPL");
-unchanged:
---- a/arch/arm/mach-bcm2708/bcm2708.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/bcm2708.h	2013-06-30 10:27:27.694569226 +0200
-@@ -0,0 +1,51 @@
-+/*
-+ * linux/arch/arm/mach-bcm2708/bcm2708.h
-+ *
-+ * BCM2708 machine support header
-+ *
-+ *  Copyright (C) 2010 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#ifndef __BCM2708_BCM2708_H
-+#define __BCM2708_BCM2708_H
-+
-+#include <linux/amba/bus.h>
-+
-+extern void __init bcm2708_init(void);
-+extern void __init bcm2708_init_irq(void);
-+extern void __init bcm2708_map_io(void);
-+extern struct sys_timer bcm2708_timer;
-+extern unsigned int mmc_status(struct device *dev);
-+
-+#define AMBA_DEVICE(name, busid, base, plat)			\
-+static struct amba_device name##_device = {			\
-+	.dev		= {					\
-+		.coherent_dma_mask = ~0,			\
-+		.init_name = busid,				\
-+		.platform_data = plat,				\
-+	},							\
-+	.res		= {					\
-+		.start	= base##_BASE,		\
-+		.end	= (base##_BASE) + SZ_4K - 1,\
-+		.flags	= IORESOURCE_MEM,			\
-+	},							\
-+	.dma_mask	= ~0,					\
-+	.irq		= base##_IRQ,				\
-+	/* .dma		= base##_DMA,*/				\
-+}
-+
-+#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/clock.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/clock.c	2013-06-30 10:27:27.694569226 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/clock.c
 @@ -0,0 +1,61 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/clock.c
@@ -4262,9 +4375,8 @@ unchanged:
 +	return -EIO;
 +}
 +EXPORT_SYMBOL(clk_set_rate);
-unchanged:
---- a/arch/arm/mach-bcm2708/clock.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/clock.h	2013-06-30 10:27:27.694569226 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/clock.h
 @@ -0,0 +1,24 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/clock.h
@@ -4290,9 +4402,8 @@ unchanged:
 +struct clk {
 +	unsigned long		rate;
 +};
-unchanged:
---- a/arch/arm/mach-bcm2708/delay.S	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/delay.S	2013-06-30 10:27:27.694569226 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/delay.S
 @@ -0,0 +1,21 @@
 +/*
 + *  linux/arch/arm/lib/delay.S
@@ -4315,9 +4426,8 @@ unchanged:
 +		bhi	bcm2708_delay
 +		mov	pc, lr
 +ENDPROC(bcm2708_delay)
-unchanged:
---- a/arch/arm/mach-bcm2708/dma.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/dma.c	2013-06-30 10:27:27.694569226 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/dma.c
 @@ -0,0 +1,399 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/dma.c
@@ -4718,9 +4828,8 @@ unchanged:
 +MODULE_LICENSE("GPL");
 +
 +MODULE_PARM_DESC(dmachans, "Bitmap of DMA channels available to the ARM");
-unchanged:
---- a/arch/arm/mach-bcm2708/dmaer.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/dmaer.c	2013-06-30 10:27:27.694569226 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/dmaer.c
 @@ -0,0 +1,887 @@
 +#include <linux/init.h>
 +#include <linux/sched.h>
@@ -5609,9 +5718,8 @@ unchanged:
 +module_init(dmaer_init);
 +module_exit(dmaer_exit);
 +
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/arm_control.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/arm_control.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/arm_control.h
 @@ -0,0 +1,419 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/arm_control.h
@@ -6032,9 +6140,8 @@ unchanged:
 +#define AJBTDO HW_REGISTER_RW(AJB_BASE+0x0c)
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/arm_power.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/arm_power.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/arm_power.h
 @@ -0,0 +1,60 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/include/mach/arm_power.h
@@ -6096,9 +6203,8 @@ unchanged:
 +};
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/clkdev.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/clkdev.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/clkdev.h
 @@ -0,0 +1,7 @@
 +#ifndef __ASM_MACH_CLKDEV_H
 +#define __ASM_MACH_CLKDEV_H
@@ -6107,9 +6213,8 @@ unchanged:
 +#define __clk_put(clk) do { } while (0)
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/debug-macro.S	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/debug-macro.S	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/debug-macro.S
 @@ -0,0 +1,22 @@
 +/* arch/arm/mach-bcm2708/include/mach/debug-macro.S
 + *
@@ -6133,9 +6238,8 @@ unchanged:
 +		.endm
 +
 +#include <asm/hardware/debug-pl01x.S>
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/dma.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/dma.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/dma.h
 @@ -0,0 +1,86 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/include/mach/dma.h
@@ -6223,9 +6327,8 @@ unchanged:
 +
 +
 +#endif /* _MACH_BCM2708_DMA_H */
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/entry-macro.S	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/entry-macro.S	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/entry-macro.S
 @@ -0,0 +1,69 @@
 +/*
 + * arch/arm/mach-bcm2708/include/mach/entry-macro.S
@@ -6296,9 +6399,8 @@ unchanged:
 +1020:	@ EQ will be set if no irqs pending
 +
 +		.endm
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/frc.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/frc.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/frc.h
 @@ -0,0 +1,38 @@
 +/*
 + *  arch/arm/mach-bcm2708/include/mach/timex.h
@@ -6338,9 +6440,8 @@ unchanged:
 +extern unsigned long long frc_clock_ticks63(void);
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/gpio.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/gpio.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/gpio.h
 @@ -0,0 +1,48 @@
 +/*
 + * arch/arm/mach-bcm2708/include/mach/gpio.h
@@ -6390,9 +6491,8 @@ unchanged:
 +
 +#endif
 +
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/hardware.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/hardware.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/hardware.h
 @@ -0,0 +1,28 @@
 +/*
 + *  arch/arm/mach-bcm2708/include/mach/hardware.h
@@ -6422,9 +6522,8 @@ unchanged:
 +#include <mach/platform.h>
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/io.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/io.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/io.h
 @@ -0,0 +1,28 @@
 +/*
 + *  arch/arm/mach-bcm2708/include/mach/io.h
@@ -6454,9 +6553,8 @@ unchanged:
 +#define __mem_pci(a)	(a)
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/irqs.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/irqs.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/irqs.h
 @@ -0,0 +1,199 @@
 +/*
 + *  arch/arm/mach-bcm2708/include/mach/irqs.h
@@ -6657,9 +6755,8 @@ unchanged:
 +
 +
 +#endif /* _BCM2708_IRQS_H_ */
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/memory.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/memory.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/memory.h
 @@ -0,0 +1,57 @@
 +/*
 + *  arch/arm/mach-bcm2708/include/mach/memory.h
@@ -6718,9 +6815,8 @@ unchanged:
 +#define __bus_to_pfn(x)     __phys_to_pfn((x) - (BUS_OFFSET - PLAT_PHYS_OFFSET))
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/platform.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/platform.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/platform.h
 @@ -0,0 +1,226 @@
 +/*
 + * arch/arm/mach-bcm2708/include/mach/platform.h
@@ -6948,9 +7044,8 @@ unchanged:
 +#endif
 +
 +/* END */
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/power.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/power.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/power.h
 @@ -0,0 +1,26 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/power.h
@@ -6978,9 +7073,8 @@ unchanged:
 +extern int bcm_power_close(BCM_POWER_HANDLE_T handle);
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/system.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/system.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/system.h
 @@ -0,0 +1,38 @@
 +/*
 + *  arch/arm/mach-bcm2708/include/mach/system.h
@@ -7020,9 +7114,8 @@ unchanged:
 +}
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/timex.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/timex.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/timex.h
 @@ -0,0 +1,23 @@
 +/*
 + *  arch/arm/mach-bcm2708/include/mach/timex.h
@@ -7047,9 +7140,8 @@ unchanged:
 + */
 +
 +#define CLOCK_TICK_RATE		(1000000)
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/uncompress.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/uncompress.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/uncompress.h
 @@ -0,0 +1,85 @@
 +/*
 + *  arch/arm/mach-bcn2708/include/mach/uncompress.h
@@ -7136,9 +7228,119 @@ unchanged:
 + */
 +#define arch_decomp_wdog()
 +
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/vcio.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/vcio.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/vc_mem.h
+@@ -0,0 +1,36 @@
++/*****************************************************************************
++* Copyright 2010 - 2011 Broadcom Corporation.  All rights reserved.
++*
++* Unless you and Broadcom execute a separate written software license
++* agreement governing use of this software, this software is licensed to you
++* under the terms of the GNU General Public License version 2, available at
++* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
++*
++* Notwithstanding the above, under no circumstances may you combine this
++* software in any way with any other Broadcom software provided under a
++* license other than the GPL, without Broadcom's express prior written
++* consent.
++*****************************************************************************/
++
++#if !defined( VC_MEM_H )
++#define VC_MEM_H
++
++#include <linux/ioctl.h>
++
++#define VC_MEM_IOC_MAGIC  'v'
++
++#define VC_MEM_IOC_MEM_PHYS_ADDR    _IOR( VC_MEM_IOC_MAGIC, 0, unsigned long )
++#define VC_MEM_IOC_MEM_SIZE         _IOR( VC_MEM_IOC_MAGIC, 1, unsigned int )
++#define VC_MEM_IOC_MEM_BASE         _IOR( VC_MEM_IOC_MAGIC, 2, unsigned int )
++#define VC_MEM_IOC_MEM_LOAD         _IOR( VC_MEM_IOC_MAGIC, 3, unsigned int )
++
++#if defined( __KERNEL__ )
++#define VC_MEM_TO_ARM_ADDR_MASK 0x3FFFFFFF
++
++extern unsigned long mm_vc_mem_phys_addr;
++extern unsigned int  mm_vc_mem_size;
++extern int vc_mem_get_current_size( void );
++#endif
++
++#endif  /* VC_MEM_H */
++
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/vc_support.h
+@@ -0,0 +1,69 @@
++#ifndef _VC_SUPPORT_H_
++#define _VC_SUPPORT_H_
++
++/*
++ * vc_support.h
++ *
++ *  Created on: 25 Nov 2012
++ *      Author: Simon
++ */
++
++enum {
++/*
++      If a MEM_HANDLE_T is discardable, the memory manager may resize it to size
++      0 at any time when it is not locked or retained.
++   */
++   MEM_FLAG_DISCARDABLE = 1 << 0,
++
++   /*
++      If a MEM_HANDLE_T is allocating (or normal), its block of memory will be
++      accessed in an allocating fashion through the cache.
++   */
++   MEM_FLAG_NORMAL = 0 << 2,
++   MEM_FLAG_ALLOCATING = MEM_FLAG_NORMAL,
++
++   /*
++      If a MEM_HANDLE_T is direct, its block of memory will be accessed
++      directly, bypassing the cache.
++   */
++   MEM_FLAG_DIRECT = 1 << 2,
++
++   /*
++      If a MEM_HANDLE_T is coherent, its block of memory will be accessed in a
++      non-allocating fashion through the cache.
++   */
++   MEM_FLAG_COHERENT = 2 << 2,
++
++   /*
++      If a MEM_HANDLE_T is L1-nonallocating, its block of memory will be accessed by
++      the VPU in a fashion which is allocating in L2, but only coherent in L1.
++   */
++   MEM_FLAG_L1_NONALLOCATING = (MEM_FLAG_DIRECT | MEM_FLAG_COHERENT),
++
++   /*
++      If a MEM_HANDLE_T is zero'd, its contents are set to 0 rather than
++      MEM_HANDLE_INVALID on allocation and resize up.
++   */
++   MEM_FLAG_ZERO = 1 << 4,
++
++   /*
++      If a MEM_HANDLE_T is uninitialised, it will not be reset to a defined value
++      (either zero, or all 1's) on allocation.
++    */
++   MEM_FLAG_NO_INIT = 1 << 5,
++
++   /*
++      Hints.
++   */
++   MEM_FLAG_HINT_PERMALOCK = 1 << 6, /* Likely to be locked for long periods of time. */
++};
++
++unsigned int AllocateVcMemory(unsigned int *pHandle, unsigned int size, unsigned int alignment, unsigned int flags);
++unsigned int ReleaseVcMemory(unsigned int handle);
++unsigned int LockVcMemory(unsigned int *pBusAddress, unsigned int handle);
++unsigned int UnlockVcMemory(unsigned int handle);
++
++unsigned int ExecuteVcCode(unsigned int code,
++		unsigned int r0, unsigned int r1, unsigned int r2, unsigned int r3, unsigned int r4, unsigned int r5);
++
++#endif
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/vcio.h
 @@ -0,0 +1,141 @@
 +/*
 + *  arch/arm/mach-bcm2708/include/mach/vcio.h
@@ -7281,122 +7483,8 @@ unchanged:
 +#define DEVICE_FILE_NAME "char_dev"
 +
 +#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/vc_mem.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/vc_mem.h	2013-06-30 10:27:27.702569225 +0200
-@@ -0,0 +1,36 @@
-+/*****************************************************************************
-+* Copyright 2010 - 2011 Broadcom Corporation.  All rights reserved.
-+*
-+* Unless you and Broadcom execute a separate written software license
-+* agreement governing use of this software, this software is licensed to you
-+* under the terms of the GNU General Public License version 2, available at
-+* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
-+*
-+* Notwithstanding the above, under no circumstances may you combine this
-+* software in any way with any other Broadcom software provided under a
-+* license other than the GPL, without Broadcom's express prior written
-+* consent.
-+*****************************************************************************/
-+
-+#if !defined( VC_MEM_H )
-+#define VC_MEM_H
-+
-+#include <linux/ioctl.h>
-+
-+#define VC_MEM_IOC_MAGIC  'v'
-+
-+#define VC_MEM_IOC_MEM_PHYS_ADDR    _IOR( VC_MEM_IOC_MAGIC, 0, unsigned long )
-+#define VC_MEM_IOC_MEM_SIZE         _IOR( VC_MEM_IOC_MAGIC, 1, unsigned int )
-+#define VC_MEM_IOC_MEM_BASE         _IOR( VC_MEM_IOC_MAGIC, 2, unsigned int )
-+#define VC_MEM_IOC_MEM_LOAD         _IOR( VC_MEM_IOC_MAGIC, 3, unsigned int )
-+
-+#if defined( __KERNEL__ )
-+#define VC_MEM_TO_ARM_ADDR_MASK 0x3FFFFFFF
-+
-+extern unsigned long mm_vc_mem_phys_addr;
-+extern unsigned int  mm_vc_mem_size;
-+extern int vc_mem_get_current_size( void );
-+#endif
-+
-+#endif  /* VC_MEM_H */
-+
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/vc_support.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/vc_support.h	2013-06-30 10:27:27.702569225 +0200
-@@ -0,0 +1,69 @@
-+#ifndef _VC_SUPPORT_H_
-+#define _VC_SUPPORT_H_
-+
-+/*
-+ * vc_support.h
-+ *
-+ *  Created on: 25 Nov 2012
-+ *      Author: Simon
-+ */
-+
-+enum {
-+/*
-+      If a MEM_HANDLE_T is discardable, the memory manager may resize it to size
-+      0 at any time when it is not locked or retained.
-+   */
-+   MEM_FLAG_DISCARDABLE = 1 << 0,
-+
-+   /*
-+      If a MEM_HANDLE_T is allocating (or normal), its block of memory will be
-+      accessed in an allocating fashion through the cache.
-+   */
-+   MEM_FLAG_NORMAL = 0 << 2,
-+   MEM_FLAG_ALLOCATING = MEM_FLAG_NORMAL,
-+
-+   /*
-+      If a MEM_HANDLE_T is direct, its block of memory will be accessed
-+      directly, bypassing the cache.
-+   */
-+   MEM_FLAG_DIRECT = 1 << 2,
-+
-+   /*
-+      If a MEM_HANDLE_T is coherent, its block of memory will be accessed in a
-+      non-allocating fashion through the cache.
-+   */
-+   MEM_FLAG_COHERENT = 2 << 2,
-+
-+   /*
-+      If a MEM_HANDLE_T is L1-nonallocating, its block of memory will be accessed by
-+      the VPU in a fashion which is allocating in L2, but only coherent in L1.
-+   */
-+   MEM_FLAG_L1_NONALLOCATING = (MEM_FLAG_DIRECT | MEM_FLAG_COHERENT),
-+
-+   /*
-+      If a MEM_HANDLE_T is zero'd, its contents are set to 0 rather than
-+      MEM_HANDLE_INVALID on allocation and resize up.
-+   */
-+   MEM_FLAG_ZERO = 1 << 4,
-+
-+   /*
-+      If a MEM_HANDLE_T is uninitialised, it will not be reset to a defined value
-+      (either zero, or all 1's) on allocation.
-+    */
-+   MEM_FLAG_NO_INIT = 1 << 5,
-+
-+   /*
-+      Hints.
-+   */
-+   MEM_FLAG_HINT_PERMALOCK = 1 << 6, /* Likely to be locked for long periods of time. */
-+};
-+
-+unsigned int AllocateVcMemory(unsigned int *pHandle, unsigned int size, unsigned int alignment, unsigned int flags);
-+unsigned int ReleaseVcMemory(unsigned int handle);
-+unsigned int LockVcMemory(unsigned int *pBusAddress, unsigned int handle);
-+unsigned int UnlockVcMemory(unsigned int handle);
-+
-+unsigned int ExecuteVcCode(unsigned int code,
-+		unsigned int r0, unsigned int r1, unsigned int r2, unsigned int r3, unsigned int r4, unsigned int r5);
-+
-+#endif
-unchanged:
---- a/arch/arm/mach-bcm2708/include/mach/vmalloc.h	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/include/mach/vmalloc.h	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/vmalloc.h
 @@ -0,0 +1,20 @@
 +/*
 + *  arch/arm/mach-bcm2708/include/mach/vmalloc.h
@@ -7418,83 +7506,8 @@ unchanged:
 + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 + */
 +#define VMALLOC_END		(0xe8000000)
-unchanged:
---- a/arch/arm/mach-bcm2708/Kconfig	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/Kconfig	2013-06-30 10:27:27.694569226 +0200
-@@ -0,0 +1,48 @@
-+menu "Broadcom BCM2708 Implementations"
-+	depends on ARCH_BCM2708
-+
-+config MACH_BCM2708
-+	bool "Broadcom BCM2708 Development Platform"
-+	select NEED_MACH_MEMORY_H
-+	select NEED_MACH_IO_H
-+	select CPU_V6
-+	help
-+	  Include support for the Broadcom(R) BCM2708 platform.
-+
-+config BCM2708_GPIO
-+	bool "BCM2708 gpio support"
-+	depends on MACH_BCM2708
-+	select ARCH_REQUIRE_GPIOLIB
-+        default y
-+	help
-+	  Include support for the Broadcom(R) BCM2708 gpio.
-+
-+config BCM2708_VCMEM
-+	bool "Videocore Memory"
-+	depends on MACH_BCM2708
-+        default y
-+        help
-+          Helper for videocore memory access and total size allocation.	   
-+
-+config BCM2708_NOL2CACHE
-+	bool "Videocore L2 cache disable"
-+	depends on MACH_BCM2708
-+        default n
-+        help
-+          Do not allow ARM to use GPU's L2 cache. Requires disable_l2cache in config.txt.
-+
-+config BCM2708_DMAER
-+	tristate "BCM2708 DMA helper"
-+	depends on MACH_BCM2708
-+        default n
-+        help
-+          Enable DMA helper for accelerating X composition
-+
-+config BCM2708_SPIDEV
-+	bool "Bind spidev to SPI0 master"
-+	depends on MACH_BCM2708  
-+	depends on SPI
-+        default y
-+		help 
-+			Binds spidev driver to the SPI0 master  
-+endmenu
-unchanged:
---- a/arch/arm/mach-bcm2708/Makefile	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/Makefile	2013-06-30 10:27:27.694569226 +0200
-@@ -0,0 +1,11 @@
-+#
-+# Makefile for the linux kernel.
-+#
-+
-+obj-$(CONFIG_MACH_BCM2708) 	+= clock.o bcm2708.o armctrl.o vcio.o power.o dma.o delay.o
-+obj-$(CONFIG_BCM2708_GPIO)	+= bcm2708_gpio.o
-+obj-$(CONFIG_BCM2708_VCMEM)	+= vc_mem.o
-+
-+obj-$(CONFIG_BCM2708_DMAER)	+= dmaer_master.o
-+dmaer_master-objs		:= dmaer.o vc_support.o
-+
-unchanged:
---- a/arch/arm/mach-bcm2708/Makefile.boot	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/Makefile.boot	2013-06-30 10:27:27.694569226 +0200
-@@ -0,0 +1,3 @@
-+   zreladdr-y	:= 0x00008000
-+params_phys-y	:= 0x00000100
-+initrd_phys-y	:= 0x00800000
-unchanged:
---- a/arch/arm/mach-bcm2708/power.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/power.c	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/power.c
 @@ -0,0 +1,194 @@
 +/*
 + *	 linux/arch/arm/mach-bcm2708/power.c
@@ -7690,9 +7703,791 @@ unchanged:
 +MODULE_AUTHOR("Phil Elwell");
 +MODULE_DESCRIPTION("Interface to BCM2708 power management");
 +MODULE_LICENSE("GPL");
-unchanged:
---- a/arch/arm/mach-bcm2708/vcio.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/vcio.c	2013-06-30 10:27:27.702569225 +0200
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/vc_mem.c
+@@ -0,0 +1,458 @@
++/*****************************************************************************
++* Copyright 2010 - 2011 Broadcom Corporation.  All rights reserved.
++*
++* Unless you and Broadcom execute a separate written software license
++* agreement governing use of this software, this software is licensed to you
++* under the terms of the GNU General Public License version 2, available at
++* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
++*
++* Notwithstanding the above, under no circumstances may you combine this
++* software in any way with any other Broadcom software provided under a
++* license other than the GPL, without Broadcom's express prior written
++* consent.
++*****************************************************************************/
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/fs.h>
++#include <linux/device.h>
++#include <linux/cdev.h>
++#include <linux/mm.h>
++#include <linux/slab.h>
++#include <linux/proc_fs.h>
++#include <asm/uaccess.h>
++#include <linux/dma-mapping.h>
++
++#ifdef CONFIG_ARCH_KONA
++#include <chal/chal_ipc.h>
++#elif CONFIG_ARCH_BCM2708
++#else
++#include <csp/chal_ipc.h>
++#endif
++
++#include "mach/vc_mem.h"
++#include <mach/vcio.h>
++
++#define DRIVER_NAME  "vc-mem"
++
++// Uncomment to enable debug logging
++// #define ENABLE_DBG
++
++#if defined(ENABLE_DBG)
++#define LOG_DBG( fmt, ... )  printk( KERN_INFO fmt "\n", ##__VA_ARGS__ )
++#else
++#define LOG_DBG( fmt, ... )
++#endif
++#define LOG_ERR( fmt, ... )  printk( KERN_ERR fmt "\n", ##__VA_ARGS__ )
++
++// Device (/dev) related variables
++static dev_t vc_mem_devnum = 0;
++static struct class *vc_mem_class = NULL;
++static struct cdev vc_mem_cdev;
++static int vc_mem_inited = 0;
++
++// Proc entry
++static struct proc_dir_entry *vc_mem_proc_entry;
++
++/*
++ * Videocore memory addresses and size
++ *
++ * Drivers that wish to know the videocore memory addresses and sizes should
++ * use these variables instead of the MM_IO_BASE and MM_ADDR_IO defines in
++ * headers. This allows the other drivers to not be tied down to a a certain
++ * address/size at compile time.
++ *
++ * In the future, the goal is to have the videocore memory virtual address and
++ * size be calculated at boot time rather than at compile time. The decision of
++ * where the videocore memory resides and its size would be in the hands of the
++ * bootloader (and/or kernel). When that happens, the values of these variables
++ * would be calculated and assigned in the init function.
++ */
++// in the 2835 VC in mapped above ARM, but ARM has full access to VC space
++unsigned long mm_vc_mem_phys_addr = 0x00000000;
++unsigned int mm_vc_mem_size = 0;
++unsigned int mm_vc_mem_base = 0;
++
++EXPORT_SYMBOL(mm_vc_mem_phys_addr);
++EXPORT_SYMBOL(mm_vc_mem_size);
++EXPORT_SYMBOL(mm_vc_mem_base);
++
++static uint phys_addr = 0;
++static uint mem_size = 0;
++static uint mem_base = 0;
++
++
++/****************************************************************************
++*
++*   vc_mem_open
++*
++***************************************************************************/
++
++static int
++vc_mem_open(struct inode *inode, struct file *file)
++{
++	(void) inode;
++	(void) file;
++
++	LOG_DBG("%s: called file = 0x%p", __func__, file);
++
++	return 0;
++}
++
++/****************************************************************************
++*
++*   vc_mem_release
++*
++***************************************************************************/
++
++static int
++vc_mem_release(struct inode *inode, struct file *file)
++{
++	(void) inode;
++	(void) file;
++
++	LOG_DBG("%s: called file = 0x%p", __func__, file);
++
++	return 0;
++}
++
++/****************************************************************************
++*
++*   vc_mem_get_size
++*
++***************************************************************************/
++
++static void
++vc_mem_get_size(void)
++{
++}
++
++/****************************************************************************
++*
++*   vc_mem_get_base
++*
++***************************************************************************/
++
++static void
++vc_mem_get_base(void)
++{
++}
++
++/****************************************************************************
++*
++*   vc_mem_get_current_size
++*
++***************************************************************************/
++
++int
++vc_mem_get_current_size(void)
++{
++	return mm_vc_mem_size;
++}
++
++EXPORT_SYMBOL_GPL(vc_mem_get_current_size);
++
++/****************************************************************************
++*
++*   vc_mem_ioctl
++*
++***************************************************************************/
++
++static long
++vc_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
++{
++	int rc = 0;
++
++	(void) cmd;
++	(void) arg;
++
++	LOG_DBG("%s: called file = 0x%p", __func__, file);
++
++	switch (cmd) {
++	case VC_MEM_IOC_MEM_PHYS_ADDR:
++		{
++			LOG_DBG("%s: VC_MEM_IOC_MEM_PHYS_ADDR=0x%p",
++				__func__, (void *) mm_vc_mem_phys_addr);
++
++			if (copy_to_user((void *) arg, &mm_vc_mem_phys_addr,
++					 sizeof (mm_vc_mem_phys_addr)) != 0) {
++				rc = -EFAULT;
++			}
++			break;
++		}
++	case VC_MEM_IOC_MEM_SIZE:
++		{
++			// Get the videocore memory size first
++			vc_mem_get_size();
++
++			LOG_DBG("%s: VC_MEM_IOC_MEM_SIZE=%u", __func__,
++				mm_vc_mem_size);
++
++			if (copy_to_user((void *) arg, &mm_vc_mem_size,
++					 sizeof (mm_vc_mem_size)) != 0) {
++				rc = -EFAULT;
++			}
++			break;
++		}
++	case VC_MEM_IOC_MEM_BASE:
++		{
++			// Get the videocore memory base
++			vc_mem_get_base();
++
++			LOG_DBG("%s: VC_MEM_IOC_MEM_BASE=%u", __func__,
++				mm_vc_mem_base);
++
++			if (copy_to_user((void *) arg, &mm_vc_mem_base,
++					 sizeof (mm_vc_mem_base)) != 0) {
++				rc = -EFAULT;
++			}
++			break;
++		}
++	case VC_MEM_IOC_MEM_LOAD:
++		{
++			// Get the videocore memory base
++			vc_mem_get_base();
++
++			LOG_DBG("%s: VC_MEM_IOC_MEM_LOAD=%u", __func__,
++				mm_vc_mem_base);
++
++			if (copy_to_user((void *) arg, &mm_vc_mem_base,
++					 sizeof (mm_vc_mem_base)) != 0) {
++				rc = -EFAULT;
++			}
++			break;
++		}
++	default:
++		{
++			return -ENOTTY;
++		}
++	}
++	LOG_DBG("%s: file = 0x%p returning %d", __func__, file, rc);
++
++	return rc;
++}
++
++/****************************************************************************
++*
++*   vc_mem_mmap
++*
++***************************************************************************/
++
++static int
++vc_mem_mmap(struct file *filp, struct vm_area_struct *vma)
++{
++	int rc = 0;
++	unsigned long length = vma->vm_end - vma->vm_start;
++	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
++
++	LOG_DBG("%s: vm_start = 0x%08lx vm_end = 0x%08lx vm_pgoff = 0x%08lx",
++		__func__, (long) vma->vm_start, (long) vma->vm_end,
++		(long) vma->vm_pgoff);
++
++	if (offset + length > mm_vc_mem_size) {
++		LOG_ERR("%s: length %ld is too big", __func__, length);
++		return -EINVAL;
++	}
++	// Do not cache the memory map
++	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
++
++	rc = remap_pfn_range(vma, vma->vm_start,
++			     (mm_vc_mem_phys_addr >> PAGE_SHIFT) +
++			     vma->vm_pgoff, length, vma->vm_page_prot);
++	if (rc != 0) {
++		LOG_ERR("%s: remap_pfn_range failed (rc=%d)", __func__, rc);
++	}
++
++	return rc;
++}
++
++/****************************************************************************
++*
++*   File Operations for the driver.
++*
++***************************************************************************/
++
++static const struct file_operations vc_mem_fops = {
++	.owner = THIS_MODULE,
++	.open = vc_mem_open,
++	.release = vc_mem_release,
++	.unlocked_ioctl = vc_mem_ioctl,
++	.mmap = vc_mem_mmap,
++};
++
++/****************************************************************************
++*
++*   vc_mem_proc_read
++*
++***************************************************************************/
++
++static int
++vc_mem_proc_read(char *buf, char **start, off_t offset, int count, int *eof,
++		 void *data)
++{
++	char *p = buf;
++
++	(void) start;
++	(void) count;
++	(void) data;
++
++	if (offset > 0) {
++		*eof = 1;
++		return 0;
++	}
++	// Get the videocore memory size first
++	vc_mem_get_size();
++
++	p += sprintf(p, "Videocore memory:\n");
++	if (mm_vc_mem_phys_addr != 0)
++		p += sprintf(p, "   Physical address: 0x%p\n",
++			     (void *) mm_vc_mem_phys_addr);
++	else
++		p += sprintf(p, "   Physical address: 0x00000000\n");
++	p += sprintf(p, "   Length (bytes):   %u\n", mm_vc_mem_size);
++
++	*eof = 1;
++	return p - buf;
++}
++
++/****************************************************************************
++*
++*   vc_mem_proc_write
++*
++***************************************************************************/
++
++static int
++vc_mem_proc_write(struct file *file, const char __user * buffer,
++		  unsigned long count, void *data)
++{
++	int rc = -EFAULT;
++	char input_str[10];
++
++	memset(input_str, 0, sizeof (input_str));
++
++	if (count > sizeof (input_str)) {
++		LOG_ERR("%s: input string length too long", __func__);
++		goto out;
++	}
++
++	if (copy_from_user(input_str, buffer, count - 1)) {
++		LOG_ERR("%s: failed to get input string", __func__);
++		goto out;
++	}
++
++	if (strncmp(input_str, "connect", strlen("connect")) == 0) {
++		// Get the videocore memory size from the videocore
++		vc_mem_get_size();
++	}
++
++      out:
++	return rc;
++}
++
++/****************************************************************************
++*
++*   vc_mem_init
++*
++***************************************************************************/
++
++static int __init
++vc_mem_init(void)
++{
++	int rc = -EFAULT;
++	struct device *dev;
++
++	LOG_DBG("%s: called", __func__);
++
++	mm_vc_mem_phys_addr = phys_addr;
++	mm_vc_mem_size = mem_size;
++	mm_vc_mem_base = mem_base;
++
++	vc_mem_get_size();
++
++	printk("vc-mem: phys_addr:0x%08lx mem_base=0x%08x mem_size:0x%08x(%u MiB)\n",
++		mm_vc_mem_phys_addr, mm_vc_mem_base, mm_vc_mem_size, mm_vc_mem_size / (1024 * 1024));
++
++	if ((rc = alloc_chrdev_region(&vc_mem_devnum, 0, 1, DRIVER_NAME)) < 0) {
++		LOG_ERR("%s: alloc_chrdev_region failed (rc=%d)", __func__, rc);
++		goto out_err;
++	}
++
++	cdev_init(&vc_mem_cdev, &vc_mem_fops);
++	if ((rc = cdev_add(&vc_mem_cdev, vc_mem_devnum, 1)) != 0) {
++		LOG_ERR("%s: cdev_add failed (rc=%d)", __func__, rc);
++		goto out_unregister;
++	}
++
++	vc_mem_class = class_create(THIS_MODULE, DRIVER_NAME);
++	if (IS_ERR(vc_mem_class)) {
++		rc = PTR_ERR(vc_mem_class);
++		LOG_ERR("%s: class_create failed (rc=%d)", __func__, rc);
++		goto out_cdev_del;
++	}
++
++	dev = device_create(vc_mem_class, NULL, vc_mem_devnum, NULL,
++			    DRIVER_NAME);
++	if (IS_ERR(dev)) {
++		rc = PTR_ERR(dev);
++		LOG_ERR("%s: device_create failed (rc=%d)", __func__, rc);
++		goto out_class_destroy;
++	}
++
++	vc_mem_proc_entry = create_proc_entry(DRIVER_NAME, 0444, NULL);
++	if (vc_mem_proc_entry == NULL) {
++		rc = -EFAULT;
++		LOG_ERR("%s: create_proc_entry failed", __func__);
++		goto out_device_destroy;
++	}
++	vc_mem_proc_entry->read_proc = vc_mem_proc_read;
++	vc_mem_proc_entry->write_proc = vc_mem_proc_write;
++
++	vc_mem_inited = 1;
++	return 0;
++
++      out_device_destroy:
++	device_destroy(vc_mem_class, vc_mem_devnum);
++
++      out_class_destroy:
++	class_destroy(vc_mem_class);
++	vc_mem_class = NULL;
++
++      out_cdev_del:
++	cdev_del(&vc_mem_cdev);
++
++      out_unregister:
++	unregister_chrdev_region(vc_mem_devnum, 1);
++
++      out_err:
++	return -1;
++}
++
++/****************************************************************************
++*
++*   vc_mem_exit
++*
++***************************************************************************/
++
++static void __exit
++vc_mem_exit(void)
++{
++	LOG_DBG("%s: called", __func__);
++
++	if (vc_mem_inited) {
++		remove_proc_entry(vc_mem_proc_entry->name, NULL);
++		device_destroy(vc_mem_class, vc_mem_devnum);
++		class_destroy(vc_mem_class);
++		cdev_del(&vc_mem_cdev);
++		unregister_chrdev_region(vc_mem_devnum, 1);
++	}
++}
++
++module_init(vc_mem_init);
++module_exit(vc_mem_exit);
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Broadcom Corporation");
++
++module_param(phys_addr, uint, 0644);
++module_param(mem_size, uint, 0644);
++module_param(mem_base, uint, 0644);
++
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/vc_support.c
+@@ -0,0 +1,319 @@
++/*
++ * vc_support.c
++ *
++ *  Created on: 25 Nov 2012
++ *      Author: Simon
++ */
++
++#include <linux/module.h>
++#include <mach/vcio.h>
++
++#ifdef ECLIPSE_IGNORE
++
++#define __user
++#define __init
++#define __exit
++#define __iomem
++#define KERN_DEBUG
++#define KERN_ERR
++#define KERN_WARNING
++#define KERN_INFO
++#define _IOWR(a, b, c) b
++#define _IOW(a, b, c) b
++#define _IO(a, b) b
++
++#endif
++
++/****** VC MAILBOX FUNCTIONALITY ******/
++unsigned int AllocateVcMemory(unsigned int *pHandle, unsigned int size, unsigned int alignment, unsigned int flags)
++{
++	struct vc_msg
++	{
++		unsigned int m_msgSize;
++		unsigned int m_response;
++
++		struct vc_tag
++		{
++			unsigned int m_tagId;
++			unsigned int m_sendBufferSize;
++			union {
++				unsigned int m_sendDataSize;
++				unsigned int m_recvDataSize;
++			};
++
++			struct args
++			{
++				union {
++					unsigned int m_size;
++					unsigned int m_handle;
++				};
++				unsigned int m_alignment;
++				unsigned int m_flags;
++			} m_args;
++		} m_tag;
++
++		unsigned int m_endTag;
++	} msg;
++	int s;
++
++	msg.m_msgSize = sizeof(msg);
++	msg.m_response = 0;
++	msg.m_endTag = 0;
++
++	//fill in the tag for the allocation command
++	msg.m_tag.m_tagId = 0x3000c;
++	msg.m_tag.m_sendBufferSize = 12;
++	msg.m_tag.m_sendDataSize = 12;
++
++	//fill in our args
++	msg.m_tag.m_args.m_size = size;
++	msg.m_tag.m_args.m_alignment = alignment;
++	msg.m_tag.m_args.m_flags = flags;
++
++	//run the command
++	s = bcm_mailbox_property(&msg, sizeof(msg));
++
++	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004)
++	{
++		*pHandle = msg.m_tag.m_args.m_handle;
++		return 0;
++	}
++	else
++	{
++		printk(KERN_ERR "failed to allocate vc memory: s=%d response=%08x recv data size=%08x\n",
++				s, msg.m_response, msg.m_tag.m_recvDataSize);
++		return 1;
++	}
++}
++
++unsigned int ReleaseVcMemory(unsigned int handle)
++{
++	struct vc_msg
++	{
++		unsigned int m_msgSize;
++		unsigned int m_response;
++
++		struct vc_tag
++		{
++			unsigned int m_tagId;
++			unsigned int m_sendBufferSize;
++			union {
++				unsigned int m_sendDataSize;
++				unsigned int m_recvDataSize;
++			};
++
++			struct args
++			{
++				union {
++					unsigned int m_handle;
++					unsigned int m_error;
++				};
++			} m_args;
++		} m_tag;
++
++		unsigned int m_endTag;
++	} msg;
++	int s;
++
++	msg.m_msgSize = sizeof(msg);
++	msg.m_response = 0;
++	msg.m_endTag = 0;
++
++	//fill in the tag for the release command
++	msg.m_tag.m_tagId = 0x3000f;
++	msg.m_tag.m_sendBufferSize = 4;
++	msg.m_tag.m_sendDataSize = 4;
++
++	//pass across the handle
++	msg.m_tag.m_args.m_handle = handle;
++
++	s = bcm_mailbox_property(&msg, sizeof(msg));
++
++	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004 && msg.m_tag.m_args.m_error == 0)
++		return 0;
++	else
++	{
++		printk(KERN_ERR "failed to release vc memory: s=%d response=%08x recv data size=%08x error=%08x\n",
++				s, msg.m_response, msg.m_tag.m_recvDataSize, msg.m_tag.m_args.m_error);
++		return 1;
++	}
++}
++
++unsigned int LockVcMemory(unsigned int *pBusAddress, unsigned int handle)
++{
++	struct vc_msg
++	{
++		unsigned int m_msgSize;
++		unsigned int m_response;
++
++		struct vc_tag
++		{
++			unsigned int m_tagId;
++			unsigned int m_sendBufferSize;
++			union {
++				unsigned int m_sendDataSize;
++				unsigned int m_recvDataSize;
++			};
++
++			struct args
++			{
++				union {
++					unsigned int m_handle;
++					unsigned int m_busAddress;
++				};
++			} m_args;
++		} m_tag;
++
++		unsigned int m_endTag;
++	} msg;
++	int s;
++
++	msg.m_msgSize = sizeof(msg);
++	msg.m_response = 0;
++	msg.m_endTag = 0;
++
++	//fill in the tag for the lock command
++	msg.m_tag.m_tagId = 0x3000d;
++	msg.m_tag.m_sendBufferSize = 4;
++	msg.m_tag.m_sendDataSize = 4;
++
++	//pass across the handle
++	msg.m_tag.m_args.m_handle = handle;
++
++	s = bcm_mailbox_property(&msg, sizeof(msg));
++
++	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004)
++	{
++		//pick out the bus address
++		*pBusAddress = msg.m_tag.m_args.m_busAddress;
++		return 0;
++	}
++	else
++	{
++		printk(KERN_ERR "failed to lock vc memory: s=%d response=%08x recv data size=%08x\n",
++				s, msg.m_response, msg.m_tag.m_recvDataSize);
++		return 1;
++	}
++}
++
++unsigned int UnlockVcMemory(unsigned int handle)
++{
++	struct vc_msg
++	{
++		unsigned int m_msgSize;
++		unsigned int m_response;
++
++		struct vc_tag
++		{
++			unsigned int m_tagId;
++			unsigned int m_sendBufferSize;
++			union {
++				unsigned int m_sendDataSize;
++				unsigned int m_recvDataSize;
++			};
++
++			struct args
++			{
++				union {
++					unsigned int m_handle;
++					unsigned int m_error;
++				};
++			} m_args;
++		} m_tag;
++
++		unsigned int m_endTag;
++	} msg;
++	int s;
++
++	msg.m_msgSize = sizeof(msg);
++	msg.m_response = 0;
++	msg.m_endTag = 0;
++
++	//fill in the tag for the unlock command
++	msg.m_tag.m_tagId = 0x3000e;
++	msg.m_tag.m_sendBufferSize = 4;
++	msg.m_tag.m_sendDataSize = 4;
++
++	//pass across the handle
++	msg.m_tag.m_args.m_handle = handle;
++
++	s = bcm_mailbox_property(&msg, sizeof(msg));
++
++	//check the error code too
++	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004 && msg.m_tag.m_args.m_error == 0)
++		return 0;
++	else
++	{
++		printk(KERN_ERR "failed to unlock vc memory: s=%d response=%08x recv data size=%08x error%08x\n",
++				s, msg.m_response, msg.m_tag.m_recvDataSize, msg.m_tag.m_args.m_error);
++		return 1;
++	}
++}
++
++unsigned int ExecuteVcCode(unsigned int code,
++		unsigned int r0, unsigned int r1, unsigned int r2, unsigned int r3, unsigned int r4, unsigned int r5)
++{
++	struct vc_msg
++	{
++		unsigned int m_msgSize;
++		unsigned int m_response;
++
++		struct vc_tag
++		{
++			unsigned int m_tagId;
++			unsigned int m_sendBufferSize;
++			union {
++				unsigned int m_sendDataSize;
++				unsigned int m_recvDataSize;
++			};
++
++			struct args
++			{
++				union {
++					unsigned int m_pCode;
++					unsigned int m_return;
++				};
++				unsigned int m_r0;
++				unsigned int m_r1;
++				unsigned int m_r2;
++				unsigned int m_r3;
++				unsigned int m_r4;
++				unsigned int m_r5;
++			} m_args;
++		} m_tag;
++
++		unsigned int m_endTag;
++	} msg;
++	int s;
++
++	msg.m_msgSize = sizeof(msg);
++	msg.m_response = 0;
++	msg.m_endTag = 0;
++
++	//fill in the tag for the unlock command
++	msg.m_tag.m_tagId = 0x30010;
++	msg.m_tag.m_sendBufferSize = 28;
++	msg.m_tag.m_sendDataSize = 28;
++
++	//pass across the handle
++	msg.m_tag.m_args.m_pCode = code;
++	msg.m_tag.m_args.m_r0 = r0;
++	msg.m_tag.m_args.m_r1 = r1;
++	msg.m_tag.m_args.m_r2 = r2;
++	msg.m_tag.m_args.m_r3 = r3;
++	msg.m_tag.m_args.m_r4 = r4;
++	msg.m_tag.m_args.m_r5 = r5;
++
++	s = bcm_mailbox_property(&msg, sizeof(msg));
++
++	//check the error code too
++	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004)
++		return msg.m_tag.m_args.m_return;
++	else
++	{
++		printk(KERN_ERR "failed to execute: s=%d response=%08x recv data size=%08x\n",
++				s, msg.m_response, msg.m_tag.m_recvDataSize);
++		return 1;
++	}
++}
++
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/vcio.c
 @@ -0,0 +1,474 @@
 +/*
 + *  linux/arch/arm/mach-bcm2708/vcio.c
@@ -8168,806 +8963,20 @@ unchanged:
 +MODULE_DESCRIPTION("ARM I/O to VideoCore processor");
 +MODULE_LICENSE("GPL");
 +MODULE_ALIAS("platform:bcm-mbox");
-unchanged:
---- a/arch/arm/mach-bcm2708/vc_mem.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/vc_mem.c	2013-06-30 10:27:27.702569225 +0200
-@@ -0,0 +1,458 @@
-+/*****************************************************************************
-+* Copyright 2010 - 2011 Broadcom Corporation.  All rights reserved.
-+*
-+* Unless you and Broadcom execute a separate written software license
-+* agreement governing use of this software, this software is licensed to you
-+* under the terms of the GNU General Public License version 2, available at
-+* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
-+*
-+* Notwithstanding the above, under no circumstances may you combine this
-+* software in any way with any other Broadcom software provided under a
-+* license other than the GPL, without Broadcom's express prior written
-+* consent.
-+*****************************************************************************/
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/fs.h>
-+#include <linux/device.h>
-+#include <linux/cdev.h>
-+#include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <linux/proc_fs.h>
-+#include <asm/uaccess.h>
-+#include <linux/dma-mapping.h>
-+
-+#ifdef CONFIG_ARCH_KONA
-+#include <chal/chal_ipc.h>
-+#elif CONFIG_ARCH_BCM2708
-+#else
-+#include <csp/chal_ipc.h>
-+#endif
-+
-+#include "mach/vc_mem.h"
-+#include <mach/vcio.h>
-+
-+#define DRIVER_NAME  "vc-mem"
-+
-+// Uncomment to enable debug logging
-+// #define ENABLE_DBG
-+
-+#if defined(ENABLE_DBG)
-+#define LOG_DBG( fmt, ... )  printk( KERN_INFO fmt "\n", ##__VA_ARGS__ )
-+#else
-+#define LOG_DBG( fmt, ... )
-+#endif
-+#define LOG_ERR( fmt, ... )  printk( KERN_ERR fmt "\n", ##__VA_ARGS__ )
-+
-+// Device (/dev) related variables
-+static dev_t vc_mem_devnum = 0;
-+static struct class *vc_mem_class = NULL;
-+static struct cdev vc_mem_cdev;
-+static int vc_mem_inited = 0;
-+
-+// Proc entry
-+static struct proc_dir_entry *vc_mem_proc_entry;
-+
-+/*
-+ * Videocore memory addresses and size
-+ *
-+ * Drivers that wish to know the videocore memory addresses and sizes should
-+ * use these variables instead of the MM_IO_BASE and MM_ADDR_IO defines in
-+ * headers. This allows the other drivers to not be tied down to a a certain
-+ * address/size at compile time.
-+ *
-+ * In the future, the goal is to have the videocore memory virtual address and
-+ * size be calculated at boot time rather than at compile time. The decision of
-+ * where the videocore memory resides and its size would be in the hands of the
-+ * bootloader (and/or kernel). When that happens, the values of these variables
-+ * would be calculated and assigned in the init function.
-+ */
-+// in the 2835 VC in mapped above ARM, but ARM has full access to VC space
-+unsigned long mm_vc_mem_phys_addr = 0x00000000;
-+unsigned int mm_vc_mem_size = 0;
-+unsigned int mm_vc_mem_base = 0;
-+
-+EXPORT_SYMBOL(mm_vc_mem_phys_addr);
-+EXPORT_SYMBOL(mm_vc_mem_size);
-+EXPORT_SYMBOL(mm_vc_mem_base);
-+
-+static uint phys_addr = 0;
-+static uint mem_size = 0;
-+static uint mem_base = 0;
-+
-+
-+/****************************************************************************
-+*
-+*   vc_mem_open
-+*
-+***************************************************************************/
-+
-+static int
-+vc_mem_open(struct inode *inode, struct file *file)
-+{
-+	(void) inode;
-+	(void) file;
-+
-+	LOG_DBG("%s: called file = 0x%p", __func__, file);
-+
-+	return 0;
-+}
-+
-+/****************************************************************************
-+*
-+*   vc_mem_release
-+*
-+***************************************************************************/
-+
-+static int
-+vc_mem_release(struct inode *inode, struct file *file)
-+{
-+	(void) inode;
-+	(void) file;
-+
-+	LOG_DBG("%s: called file = 0x%p", __func__, file);
-+
-+	return 0;
-+}
-+
-+/****************************************************************************
-+*
-+*   vc_mem_get_size
-+*
-+***************************************************************************/
-+
-+static void
-+vc_mem_get_size(void)
-+{
-+}
-+
-+/****************************************************************************
-+*
-+*   vc_mem_get_base
-+*
-+***************************************************************************/
-+
-+static void
-+vc_mem_get_base(void)
-+{
-+}
-+
-+/****************************************************************************
-+*
-+*   vc_mem_get_current_size
-+*
-+***************************************************************************/
-+
-+int
-+vc_mem_get_current_size(void)
-+{
-+	return mm_vc_mem_size;
-+}
-+
-+EXPORT_SYMBOL_GPL(vc_mem_get_current_size);
-+
-+/****************************************************************************
-+*
-+*   vc_mem_ioctl
-+*
-+***************************************************************************/
-+
-+static long
-+vc_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-+{
-+	int rc = 0;
-+
-+	(void) cmd;
-+	(void) arg;
-+
-+	LOG_DBG("%s: called file = 0x%p", __func__, file);
-+
-+	switch (cmd) {
-+	case VC_MEM_IOC_MEM_PHYS_ADDR:
-+		{
-+			LOG_DBG("%s: VC_MEM_IOC_MEM_PHYS_ADDR=0x%p",
-+				__func__, (void *) mm_vc_mem_phys_addr);
-+
-+			if (copy_to_user((void *) arg, &mm_vc_mem_phys_addr,
-+					 sizeof (mm_vc_mem_phys_addr)) != 0) {
-+				rc = -EFAULT;
-+			}
-+			break;
-+		}
-+	case VC_MEM_IOC_MEM_SIZE:
-+		{
-+			// Get the videocore memory size first
-+			vc_mem_get_size();
-+
-+			LOG_DBG("%s: VC_MEM_IOC_MEM_SIZE=%u", __func__,
-+				mm_vc_mem_size);
-+
-+			if (copy_to_user((void *) arg, &mm_vc_mem_size,
-+					 sizeof (mm_vc_mem_size)) != 0) {
-+				rc = -EFAULT;
-+			}
-+			break;
-+		}
-+	case VC_MEM_IOC_MEM_BASE:
-+		{
-+			// Get the videocore memory base
-+			vc_mem_get_base();
-+
-+			LOG_DBG("%s: VC_MEM_IOC_MEM_BASE=%u", __func__,
-+				mm_vc_mem_base);
-+
-+			if (copy_to_user((void *) arg, &mm_vc_mem_base,
-+					 sizeof (mm_vc_mem_base)) != 0) {
-+				rc = -EFAULT;
-+			}
-+			break;
-+		}
-+	case VC_MEM_IOC_MEM_LOAD:
-+		{
-+			// Get the videocore memory base
-+			vc_mem_get_base();
-+
-+			LOG_DBG("%s: VC_MEM_IOC_MEM_LOAD=%u", __func__,
-+				mm_vc_mem_base);
-+
-+			if (copy_to_user((void *) arg, &mm_vc_mem_base,
-+					 sizeof (mm_vc_mem_base)) != 0) {
-+				rc = -EFAULT;
-+			}
-+			break;
-+		}
-+	default:
-+		{
-+			return -ENOTTY;
-+		}
-+	}
-+	LOG_DBG("%s: file = 0x%p returning %d", __func__, file, rc);
-+
-+	return rc;
-+}
-+
-+/****************************************************************************
-+*
-+*   vc_mem_mmap
-+*
-+***************************************************************************/
-+
-+static int
-+vc_mem_mmap(struct file *filp, struct vm_area_struct *vma)
-+{
-+	int rc = 0;
-+	unsigned long length = vma->vm_end - vma->vm_start;
-+	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-+
-+	LOG_DBG("%s: vm_start = 0x%08lx vm_end = 0x%08lx vm_pgoff = 0x%08lx",
-+		__func__, (long) vma->vm_start, (long) vma->vm_end,
-+		(long) vma->vm_pgoff);
-+
-+	if (offset + length > mm_vc_mem_size) {
-+		LOG_ERR("%s: length %ld is too big", __func__, length);
-+		return -EINVAL;
-+	}
-+	// Do not cache the memory map
-+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-+
-+	rc = remap_pfn_range(vma, vma->vm_start,
-+			     (mm_vc_mem_phys_addr >> PAGE_SHIFT) +
-+			     vma->vm_pgoff, length, vma->vm_page_prot);
-+	if (rc != 0) {
-+		LOG_ERR("%s: remap_pfn_range failed (rc=%d)", __func__, rc);
-+	}
-+
-+	return rc;
-+}
-+
-+/****************************************************************************
-+*
-+*   File Operations for the driver.
-+*
-+***************************************************************************/
-+
-+static const struct file_operations vc_mem_fops = {
-+	.owner = THIS_MODULE,
-+	.open = vc_mem_open,
-+	.release = vc_mem_release,
-+	.unlocked_ioctl = vc_mem_ioctl,
-+	.mmap = vc_mem_mmap,
-+};
-+
-+/****************************************************************************
-+*
-+*   vc_mem_proc_read
-+*
-+***************************************************************************/
-+
-+static int
-+vc_mem_proc_read(char *buf, char **start, off_t offset, int count, int *eof,
-+		 void *data)
-+{
-+	char *p = buf;
-+
-+	(void) start;
-+	(void) count;
-+	(void) data;
-+
-+	if (offset > 0) {
-+		*eof = 1;
-+		return 0;
-+	}
-+	// Get the videocore memory size first
-+	vc_mem_get_size();
-+
-+	p += sprintf(p, "Videocore memory:\n");
-+	if (mm_vc_mem_phys_addr != 0)
-+		p += sprintf(p, "   Physical address: 0x%p\n",
-+			     (void *) mm_vc_mem_phys_addr);
-+	else
-+		p += sprintf(p, "   Physical address: 0x00000000\n");
-+	p += sprintf(p, "   Length (bytes):   %u\n", mm_vc_mem_size);
-+
-+	*eof = 1;
-+	return p - buf;
-+}
-+
-+/****************************************************************************
-+*
-+*   vc_mem_proc_write
-+*
-+***************************************************************************/
-+
-+static int
-+vc_mem_proc_write(struct file *file, const char __user * buffer,
-+		  unsigned long count, void *data)
-+{
-+	int rc = -EFAULT;
-+	char input_str[10];
-+
-+	memset(input_str, 0, sizeof (input_str));
-+
-+	if (count > sizeof (input_str)) {
-+		LOG_ERR("%s: input string length too long", __func__);
-+		goto out;
-+	}
-+
-+	if (copy_from_user(input_str, buffer, count - 1)) {
-+		LOG_ERR("%s: failed to get input string", __func__);
-+		goto out;
-+	}
-+
-+	if (strncmp(input_str, "connect", strlen("connect")) == 0) {
-+		// Get the videocore memory size from the videocore
-+		vc_mem_get_size();
-+	}
-+
-+      out:
-+	return rc;
-+}
-+
-+/****************************************************************************
-+*
-+*   vc_mem_init
-+*
-+***************************************************************************/
-+
-+static int __init
-+vc_mem_init(void)
-+{
-+	int rc = -EFAULT;
-+	struct device *dev;
-+
-+	LOG_DBG("%s: called", __func__);
-+
-+	mm_vc_mem_phys_addr = phys_addr;
-+	mm_vc_mem_size = mem_size;
-+	mm_vc_mem_base = mem_base;
-+
-+	vc_mem_get_size();
-+
-+	printk("vc-mem: phys_addr:0x%08lx mem_base=0x%08x mem_size:0x%08x(%u MiB)\n",
-+		mm_vc_mem_phys_addr, mm_vc_mem_base, mm_vc_mem_size, mm_vc_mem_size / (1024 * 1024));
-+
-+	if ((rc = alloc_chrdev_region(&vc_mem_devnum, 0, 1, DRIVER_NAME)) < 0) {
-+		LOG_ERR("%s: alloc_chrdev_region failed (rc=%d)", __func__, rc);
-+		goto out_err;
-+	}
-+
-+	cdev_init(&vc_mem_cdev, &vc_mem_fops);
-+	if ((rc = cdev_add(&vc_mem_cdev, vc_mem_devnum, 1)) != 0) {
-+		LOG_ERR("%s: cdev_add failed (rc=%d)", __func__, rc);
-+		goto out_unregister;
-+	}
-+
-+	vc_mem_class = class_create(THIS_MODULE, DRIVER_NAME);
-+	if (IS_ERR(vc_mem_class)) {
-+		rc = PTR_ERR(vc_mem_class);
-+		LOG_ERR("%s: class_create failed (rc=%d)", __func__, rc);
-+		goto out_cdev_del;
-+	}
-+
-+	dev = device_create(vc_mem_class, NULL, vc_mem_devnum, NULL,
-+			    DRIVER_NAME);
-+	if (IS_ERR(dev)) {
-+		rc = PTR_ERR(dev);
-+		LOG_ERR("%s: device_create failed (rc=%d)", __func__, rc);
-+		goto out_class_destroy;
-+	}
-+
-+	vc_mem_proc_entry = create_proc_entry(DRIVER_NAME, 0444, NULL);
-+	if (vc_mem_proc_entry == NULL) {
-+		rc = -EFAULT;
-+		LOG_ERR("%s: create_proc_entry failed", __func__);
-+		goto out_device_destroy;
-+	}
-+	vc_mem_proc_entry->read_proc = vc_mem_proc_read;
-+	vc_mem_proc_entry->write_proc = vc_mem_proc_write;
-+
-+	vc_mem_inited = 1;
-+	return 0;
-+
-+      out_device_destroy:
-+	device_destroy(vc_mem_class, vc_mem_devnum);
-+
-+      out_class_destroy:
-+	class_destroy(vc_mem_class);
-+	vc_mem_class = NULL;
-+
-+      out_cdev_del:
-+	cdev_del(&vc_mem_cdev);
-+
-+      out_unregister:
-+	unregister_chrdev_region(vc_mem_devnum, 1);
-+
-+      out_err:
-+	return -1;
-+}
-+
-+/****************************************************************************
-+*
-+*   vc_mem_exit
-+*
-+***************************************************************************/
-+
-+static void __exit
-+vc_mem_exit(void)
-+{
-+	LOG_DBG("%s: called", __func__);
-+
-+	if (vc_mem_inited) {
-+		remove_proc_entry(vc_mem_proc_entry->name, NULL);
-+		device_destroy(vc_mem_class, vc_mem_devnum);
-+		class_destroy(vc_mem_class);
-+		cdev_del(&vc_mem_cdev);
-+		unregister_chrdev_region(vc_mem_devnum, 1);
-+	}
-+}
-+
-+module_init(vc_mem_init);
-+module_exit(vc_mem_exit);
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Broadcom Corporation");
-+
-+module_param(phys_addr, uint, 0644);
-+module_param(mem_size, uint, 0644);
-+module_param(mem_base, uint, 0644);
-+
-unchanged:
---- a/arch/arm/mach-bcm2708/vc_support.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/arch/arm/mach-bcm2708/vc_support.c	2013-06-30 10:27:27.702569225 +0200
-@@ -0,0 +1,319 @@
-+/*
-+ * vc_support.c
-+ *
-+ *  Created on: 25 Nov 2012
-+ *      Author: Simon
-+ */
-+
-+#include <linux/module.h>
-+#include <mach/vcio.h>
-+
-+#ifdef ECLIPSE_IGNORE
-+
-+#define __user
-+#define __init
-+#define __exit
-+#define __iomem
-+#define KERN_DEBUG
-+#define KERN_ERR
-+#define KERN_WARNING
-+#define KERN_INFO
-+#define _IOWR(a, b, c) b
-+#define _IOW(a, b, c) b
-+#define _IO(a, b) b
-+
-+#endif
-+
-+/****** VC MAILBOX FUNCTIONALITY ******/
-+unsigned int AllocateVcMemory(unsigned int *pHandle, unsigned int size, unsigned int alignment, unsigned int flags)
-+{
-+	struct vc_msg
-+	{
-+		unsigned int m_msgSize;
-+		unsigned int m_response;
-+
-+		struct vc_tag
-+		{
-+			unsigned int m_tagId;
-+			unsigned int m_sendBufferSize;
-+			union {
-+				unsigned int m_sendDataSize;
-+				unsigned int m_recvDataSize;
-+			};
-+
-+			struct args
-+			{
-+				union {
-+					unsigned int m_size;
-+					unsigned int m_handle;
-+				};
-+				unsigned int m_alignment;
-+				unsigned int m_flags;
-+			} m_args;
-+		} m_tag;
-+
-+		unsigned int m_endTag;
-+	} msg;
-+	int s;
-+
-+	msg.m_msgSize = sizeof(msg);
-+	msg.m_response = 0;
-+	msg.m_endTag = 0;
-+
-+	//fill in the tag for the allocation command
-+	msg.m_tag.m_tagId = 0x3000c;
-+	msg.m_tag.m_sendBufferSize = 12;
-+	msg.m_tag.m_sendDataSize = 12;
-+
-+	//fill in our args
-+	msg.m_tag.m_args.m_size = size;
-+	msg.m_tag.m_args.m_alignment = alignment;
-+	msg.m_tag.m_args.m_flags = flags;
-+
-+	//run the command
-+	s = bcm_mailbox_property(&msg, sizeof(msg));
-+
-+	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004)
-+	{
-+		*pHandle = msg.m_tag.m_args.m_handle;
-+		return 0;
-+	}
-+	else
-+	{
-+		printk(KERN_ERR "failed to allocate vc memory: s=%d response=%08x recv data size=%08x\n",
-+				s, msg.m_response, msg.m_tag.m_recvDataSize);
-+		return 1;
-+	}
-+}
-+
-+unsigned int ReleaseVcMemory(unsigned int handle)
-+{
-+	struct vc_msg
-+	{
-+		unsigned int m_msgSize;
-+		unsigned int m_response;
-+
-+		struct vc_tag
-+		{
-+			unsigned int m_tagId;
-+			unsigned int m_sendBufferSize;
-+			union {
-+				unsigned int m_sendDataSize;
-+				unsigned int m_recvDataSize;
-+			};
-+
-+			struct args
-+			{
-+				union {
-+					unsigned int m_handle;
-+					unsigned int m_error;
-+				};
-+			} m_args;
-+		} m_tag;
-+
-+		unsigned int m_endTag;
-+	} msg;
-+	int s;
-+
-+	msg.m_msgSize = sizeof(msg);
-+	msg.m_response = 0;
-+	msg.m_endTag = 0;
-+
-+	//fill in the tag for the release command
-+	msg.m_tag.m_tagId = 0x3000f;
-+	msg.m_tag.m_sendBufferSize = 4;
-+	msg.m_tag.m_sendDataSize = 4;
-+
-+	//pass across the handle
-+	msg.m_tag.m_args.m_handle = handle;
-+
-+	s = bcm_mailbox_property(&msg, sizeof(msg));
-+
-+	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004 && msg.m_tag.m_args.m_error == 0)
-+		return 0;
-+	else
-+	{
-+		printk(KERN_ERR "failed to release vc memory: s=%d response=%08x recv data size=%08x error=%08x\n",
-+				s, msg.m_response, msg.m_tag.m_recvDataSize, msg.m_tag.m_args.m_error);
-+		return 1;
-+	}
-+}
-+
-+unsigned int LockVcMemory(unsigned int *pBusAddress, unsigned int handle)
-+{
-+	struct vc_msg
-+	{
-+		unsigned int m_msgSize;
-+		unsigned int m_response;
-+
-+		struct vc_tag
-+		{
-+			unsigned int m_tagId;
-+			unsigned int m_sendBufferSize;
-+			union {
-+				unsigned int m_sendDataSize;
-+				unsigned int m_recvDataSize;
-+			};
-+
-+			struct args
-+			{
-+				union {
-+					unsigned int m_handle;
-+					unsigned int m_busAddress;
-+				};
-+			} m_args;
-+		} m_tag;
-+
-+		unsigned int m_endTag;
-+	} msg;
-+	int s;
-+
-+	msg.m_msgSize = sizeof(msg);
-+	msg.m_response = 0;
-+	msg.m_endTag = 0;
-+
-+	//fill in the tag for the lock command
-+	msg.m_tag.m_tagId = 0x3000d;
-+	msg.m_tag.m_sendBufferSize = 4;
-+	msg.m_tag.m_sendDataSize = 4;
-+
-+	//pass across the handle
-+	msg.m_tag.m_args.m_handle = handle;
-+
-+	s = bcm_mailbox_property(&msg, sizeof(msg));
-+
-+	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004)
-+	{
-+		//pick out the bus address
-+		*pBusAddress = msg.m_tag.m_args.m_busAddress;
-+		return 0;
-+	}
-+	else
-+	{
-+		printk(KERN_ERR "failed to lock vc memory: s=%d response=%08x recv data size=%08x\n",
-+				s, msg.m_response, msg.m_tag.m_recvDataSize);
-+		return 1;
-+	}
-+}
-+
-+unsigned int UnlockVcMemory(unsigned int handle)
-+{
-+	struct vc_msg
-+	{
-+		unsigned int m_msgSize;
-+		unsigned int m_response;
-+
-+		struct vc_tag
-+		{
-+			unsigned int m_tagId;
-+			unsigned int m_sendBufferSize;
-+			union {
-+				unsigned int m_sendDataSize;
-+				unsigned int m_recvDataSize;
-+			};
-+
-+			struct args
-+			{
-+				union {
-+					unsigned int m_handle;
-+					unsigned int m_error;
-+				};
-+			} m_args;
-+		} m_tag;
-+
-+		unsigned int m_endTag;
-+	} msg;
-+	int s;
-+
-+	msg.m_msgSize = sizeof(msg);
-+	msg.m_response = 0;
-+	msg.m_endTag = 0;
-+
-+	//fill in the tag for the unlock command
-+	msg.m_tag.m_tagId = 0x3000e;
-+	msg.m_tag.m_sendBufferSize = 4;
-+	msg.m_tag.m_sendDataSize = 4;
-+
-+	//pass across the handle
-+	msg.m_tag.m_args.m_handle = handle;
-+
-+	s = bcm_mailbox_property(&msg, sizeof(msg));
-+
-+	//check the error code too
-+	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004 && msg.m_tag.m_args.m_error == 0)
-+		return 0;
-+	else
-+	{
-+		printk(KERN_ERR "failed to unlock vc memory: s=%d response=%08x recv data size=%08x error%08x\n",
-+				s, msg.m_response, msg.m_tag.m_recvDataSize, msg.m_tag.m_args.m_error);
-+		return 1;
-+	}
-+}
-+
-+unsigned int ExecuteVcCode(unsigned int code,
-+		unsigned int r0, unsigned int r1, unsigned int r2, unsigned int r3, unsigned int r4, unsigned int r5)
-+{
-+	struct vc_msg
-+	{
-+		unsigned int m_msgSize;
-+		unsigned int m_response;
-+
-+		struct vc_tag
-+		{
-+			unsigned int m_tagId;
-+			unsigned int m_sendBufferSize;
-+			union {
-+				unsigned int m_sendDataSize;
-+				unsigned int m_recvDataSize;
-+			};
-+
-+			struct args
-+			{
-+				union {
-+					unsigned int m_pCode;
-+					unsigned int m_return;
-+				};
-+				unsigned int m_r0;
-+				unsigned int m_r1;
-+				unsigned int m_r2;
-+				unsigned int m_r3;
-+				unsigned int m_r4;
-+				unsigned int m_r5;
-+			} m_args;
-+		} m_tag;
-+
-+		unsigned int m_endTag;
-+	} msg;
-+	int s;
-+
-+	msg.m_msgSize = sizeof(msg);
-+	msg.m_response = 0;
-+	msg.m_endTag = 0;
-+
-+	//fill in the tag for the unlock command
-+	msg.m_tag.m_tagId = 0x30010;
-+	msg.m_tag.m_sendBufferSize = 28;
-+	msg.m_tag.m_sendDataSize = 28;
-+
-+	//pass across the handle
-+	msg.m_tag.m_args.m_pCode = code;
-+	msg.m_tag.m_args.m_r0 = r0;
-+	msg.m_tag.m_args.m_r1 = r1;
-+	msg.m_tag.m_args.m_r2 = r2;
-+	msg.m_tag.m_args.m_r3 = r3;
-+	msg.m_tag.m_args.m_r4 = r4;
-+	msg.m_tag.m_args.m_r5 = r5;
-+
-+	s = bcm_mailbox_property(&msg, sizeof(msg));
-+
-+	//check the error code too
-+	if (s == 0 && msg.m_response == 0x80000000 && msg.m_tag.m_recvDataSize == 0x80000004)
-+		return msg.m_tag.m_args.m_return;
-+	else
-+	{
-+		printk(KERN_ERR "failed to execute: s=%d response=%08x recv data size=%08x\n",
-+				s, msg.m_response, msg.m_tag.m_recvDataSize);
-+		return 1;
-+	}
-+}
-+
-unchanged:
---- a/arch/arm/Makefile	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/Makefile	2013-06-30 10:27:26.982569229 +0200
-@@ -198,6 +198,7 @@
- machine-$(CONFIG_MACH_SPEAR320)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR600)		:= spear6xx
- machine-$(CONFIG_ARCH_ZYNQ)		:= zynq
-+machine-$(CONFIG_ARCH_BCM2708)		:= bcm2708
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -354,7 +354,7 @@ config CPU_PJ4
  
- # Platform directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
-unchanged:
---- a/arch/arm/mm/alignment.c	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/mm/alignment.c	2013-06-30 10:27:29.138569218 +0200
-@@ -856,9 +856,11 @@
+ # ARMv6
+ config CPU_V6
+-	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
++	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || MACH_BCM2708
+ 	select CPU_32v6
+ 	select CPU_ABRT_EV6
+ 	select CPU_PABRT_V6
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -856,9 +856,11 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
  	case 0x08000000:	/* ldm or stm, or thumb-2 32bit instruction */
  		if (thumb2_32b)
  			handler = do_alignment_t32_to_handler(&instr, regs, &offset);
@@ -8981,22 +8990,9 @@ unchanged:
  
  	default:
  		goto bad;
-unchanged:
---- a/arch/arm/mm/Kconfig	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/mm/Kconfig	2013-06-30 10:27:29.138569218 +0200
-@@ -354,7 +354,7 @@
- 
- # ARMv6
- config CPU_V6
--	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-+	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || MACH_BCM2708
- 	select CPU_32v6
- 	select CPU_ABRT_EV6
- 	select CPU_PABRT_V6
-unchanged:
---- a/arch/arm/mm/proc-v6.S	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/mm/proc-v6.S	2013-06-30 10:27:29.174569218 +0200
-@@ -73,10 +73,19 @@
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -73,10 +73,19 @@ ENDPROC(cpu_v6_reset)
   *
   *	IRQs are already disabled.
   */
@@ -9019,10 +9015,9 @@ unchanged:
  	mov	pc, lr
  
  ENTRY(cpu_v6_dcache_clean_area)
-unchanged:
---- a/arch/arm/tools/mach-types	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/tools/mach-types	2013-06-30 10:27:29.678569215 +0200
-@@ -519,6 +519,7 @@
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -519,6 +519,7 @@ torbreck		MACH_TORBRECK		TORBRECK		3090
  prima2_evb		MACH_PRIMA2_EVB		PRIMA2_EVB		3103
  paz00			MACH_PAZ00		PAZ00			3128
  acmenetusfoxg20		MACH_ACMENETUSFOXG20	ACMENETUSFOXG20		3129
@@ -9030,11 +9025,9 @@ unchanged:
  ag5evm			MACH_AG5EVM		AG5EVM			3189
  tsunagi			MACH_TSUNAGI		TSUNAGI			3197
  ics_if_voip		MACH_ICS_IF_VOIP	ICS_IF_VOIP		3206
-only in patch2:
-unchanged:
---- a/arch/arm/vfp/vfpmodule.c	2012-12-17 18:27:45.000000000 +0100
-+++ b/arch/arm/vfp/vfpmodule.c	2013-06-30 10:27:29.682569215 +0200
-@@ -413,7 +413,7 @@
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -413,7 +413,7 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
  	 * If there isn't a second FP instruction, exit now. Note that
  	 * the FPEXC.FP2V bit is valid only if FPEXC.EX is 1.
  	 */
@@ -9043,3 +9036,75 @@ unchanged:
  		goto exit;
  
  	/*
+--- /dev/null
++++ b/include/linux/broadcom/vc_cma.h
+@@ -0,0 +1,30 @@
++/*****************************************************************************
++* Copyright 2012 Broadcom Corporation.  All rights reserved.
++*
++* Unless you and Broadcom execute a separate written software license
++* agreement governing use of this software, this software is licensed to you
++* under the terms of the GNU General Public License version 2, available at
++* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
++*
++* Notwithstanding the above, under no circumstances may you combine this
++* software in any way with any other Broadcom software provided under a
++* license other than the GPL, without Broadcom's express prior written
++* consent.
++*****************************************************************************/
++
++#if !defined( VC_CMA_H )
++#define VC_CMA_H
++
++#include <linux/ioctl.h>
++
++#define VC_CMA_IOC_MAGIC 0xc5
++
++#define VC_CMA_IOC_RESERVE _IO(VC_CMA_IOC_MAGIC, 0)
++
++#ifdef __KERNEL__
++extern void __init vc_cma_early_init(void);
++extern void __init vc_cma_reserve(void);
++#endif
++
++#endif /* VC_CMA_H */
++
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -2680,20 +2680,23 @@ static int move_module(struct module *mod, struct load_info *info)
+ 	memset(ptr, 0, mod->core_size);
+ 	mod->module_core = ptr;
+ 
+-	ptr = module_alloc_update_bounds(mod->init_size);
+-	/*
+-	 * The pointer to this block is stored in the module structure
+-	 * which is inside the block. This block doesn't need to be
+-	 * scanned as it contains data and code that will be freed
+-	 * after the module is initialized.
+-	 */
+-	kmemleak_ignore(ptr);
+-	if (!ptr && mod->init_size) {
+-		module_free(mod, mod->module_core);
+-		return -ENOMEM;
++	if (mod->init_size) {
++		ptr = module_alloc_update_bounds(mod->init_size);
++		/*
++		 * The pointer to this block is stored in the module structure
++		 * which is inside the block. This block doesn't need to be
++		 * scanned as it contains data and code that will be freed
++		 * after the module is initialized.
++		 */
++		kmemleak_ignore(ptr);
++		if (!ptr && mod->init_size) {
++			module_free(mod, mod->module_core);
++			return -ENOMEM;
++		}
++		memset(ptr, 0, mod->init_size);
++		mod->module_init = ptr;
+ 	}
+-	memset(ptr, 0, mod->init_size);
+-	mod->module_init = ptr;
++	else mod->module_init = NULL;
+ 
+ 	/* Transfer each section which specifies SHF_ALLOC */
+ 	pr_debug("final section addresses:\n");
