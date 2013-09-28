@@ -355,7 +355,7 @@ $(call KernelPackage/mac80211/Default)
 	TITLE:= Realtek Support
 	DEPENDS+= @USB_SUPPORT +kmod-mac80211
 	FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/rtlwifi/rtlwifi.ko
-	AUTOLOAD:=$(call AutoLoad,40,rtlwifi)
+	AUTOLOAD:=$(call AutoLoad,35,rtlwifi)
 endef
 
 define KernelPackage/rtl8192c-common
@@ -363,7 +363,7 @@ $(call KernelPackage/mac80211/Default)
 	TITLE:= Realtek 8192C Common support
 	DEPENDS+= @USB_SUPPORT +kmod-rtlwifi
 	FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/rtlwifi/rtl8192c/rtl8192c-common.ko
-	AUTOLOAD:=$(call AutoLoad,58,rtl8192c-common)
+	AUTOLOAD:=$(call AutoLoad,36,rtl8192c-common)
 endef
 
 define KernelPackage/rtl8192ce
@@ -371,7 +371,7 @@ $(call KernelPackage/mac80211/Default)
 	TITLE:= Realtek 8192CE
 	DEPENDS+= @USB_SUPPORT +kmod-rtl8192c-common
 	FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/rtlwifi/rtl8192ce/rtl8192ce.ko
-	AUTOLOAD:=$(call AutoLoad,60,rtl8192ce)
+	AUTOLOAD:=$(call AutoLoad,37,rtl8192ce)
 endef
 
 define KernelPackage/rtl8192se
@@ -379,7 +379,7 @@ $(call KernelPackage/mac80211/Default)
 	TITLE:= Realtek 8192SE
 	DEPENDS+= @USB_SUPPORT +kmod-rtlwifi
 	FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/rtlwifi/rtl8192se/rtl8192se.ko
-	AUTOLOAD:=$(call AutoLoad,60,rtl8192se)
+	AUTOLOAD:=$(call AutoLoad,36,rtl8192se)
 endef
 
 define KernelPackage/rtl8192de
@@ -387,7 +387,7 @@ $(call KernelPackage/mac80211/Default)
 	TITLE:= Realtek 8192DE
 	DEPENDS+= @USB_SUPPORT +kmod-rtlwifi
 	FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/rtlwifi/rtl8192de/rtl8192de.ko
-	AUTOLOAD:=$(call AutoLoad,60,rtl8192de)
+	AUTOLOAD:=$(call AutoLoad,36,rtl8192de)
 endef
 
 define KernelPackage/rtl8192cu
@@ -395,7 +395,7 @@ $(call KernelPackage/mac80211/Default)
 	TITLE:= Realtek 8192CU
 	DEPENDS+= @USB_SUPPORT +kmod-rtl8192c-common
 	FILES:=$(PKG_BUILD_DIR)/drivers/net/wireless/rtlwifi/rtl8192cu/rtl8192cu.ko
-	AUTOLOAD:=$(call AutoLoad,60,rtl8192cu)
+	AUTOLOAD:=$(call AutoLoad,37,rtl8192cu)
 endef
 
 ZD1211FW_NAME:=zd1211-firmware
