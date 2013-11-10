@@ -13,12 +13,14 @@ FEATURES:=squashfs
 CFLAGS:=-Os -pipe -fno-caller-saves -mcpu=405
 MAINTAINER:=Imre Kaloz <kaloz@openwrt.org>
 
-LINUX_VERSION:=3.3.8
+LINUX_VERSION:=3.8.13
 
 include $(INCLUDE_DIR)/target.mk
 
 define Target/Description
 	Build firmware images for AMCC/IBM PPC40x based boards.
 endef
+
+KERNELNAME:="uImage cuImage.magicbox cuImage.openrb"
 
 $(eval $(call BuildTarget))

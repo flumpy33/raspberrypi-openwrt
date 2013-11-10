@@ -6,7 +6,7 @@
 # Licence GPL V2
 # Author david.goodenough@linkchoose.co.uk
 # Based on cf2nand from RB532 support
-. /etc/functions.sh
+. /lib/functions.sh
 
 wget2nand_dir=/tmp/wget2nand
 mnt_kernel=$wget2nand_dir/mnt_kernel
@@ -27,7 +27,7 @@ url=$1
         exit 1
 }
 
-url_kernel=$url/openwrt-ar71xx-nand-vmlinux.elf
+url_kernel=$url/openwrt-ar71xx-nand-vmlinux-lzma.elf
 url_rootfs=$url/openwrt-ar71xx-nand-rootfs.tar.gz
 
 mtd_kernel="$(find_mtd_part 'kernel')"

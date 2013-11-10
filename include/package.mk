@@ -13,13 +13,18 @@ PKG_BUILD_DIR ?= $(BUILD_DIR)/$(PKG_NAME)$(if $(PKG_VERSION),-$(PKG_VERSION))
 PKG_INSTALL_DIR ?= $(PKG_BUILD_DIR)/ipkg-install
 PKG_MD5SUM ?= unknown
 PKG_BUILD_PARALLEL ?=
-PKG_INFO_DIR := $(STAGING_DIR)/pkginfo
+
+ifneq ($(CONFIG_PKG_BUILD_USE_JOBSERVER),)
+  MAKE_J:=$(if $(MAKE_JOBSERVER),$(MAKE_JOBSERVER) -j)
+else
+  MAKE_J:=-j$(CONFIG_PKG_BUILD_JOBS)
+endif
 
 ifeq ($(strip $(PKG_BUILD_PARALLEL)),0)
 PKG_JOBS?=-j1
 else
 PKG_JOBS?=$(if $(PKG_BUILD_PARALLEL)$(CONFIG_PKG_DEFAULT_PARALLEL),\
-	$(if $(CONFIG_PKG_BUILD_PARALLEL),-j$(CONFIG_PKG_BUILD_JOBS),-j1),-j1)
+	$(if $(CONFIG_PKG_BUILD_PARALLEL),$(MAKE_J),-j1),-j1)
 endif
 
 include $(INCLUDE_DIR)/prereq.mk
@@ -45,6 +50,9 @@ ifneq ($(if $(CONFIG_SRC_TREE_OVERRIDE),$(wildcard ./git-src)),)
   USE_GIT_TREE:=1
   QUILT:=1
 endif
+
+PKG_DIR_NAME:=$(lastword $(subst /,$(space),$(CURDIR)))
+PKG_INSTALL_STAMP:=$(PKG_INFO_DIR)/$(PKG_DIR_NAME).$(if $(BUILD_VARIANT),$(BUILD_VARIANT),default).install
 
 include $(INCLUDE_DIR)/download.mk
 include $(INCLUDE_DIR)/quilt.mk
@@ -163,6 +171,11 @@ define Build/DefaultTargets
 	$(foreach hook,$(Hooks/InstallDev/Post),\
 		$(call $(hook),$(TMP_DIR)/stage-$(PKG_NAME),$(TMP_DIR)/stage-$(PKG_NAME)/host)$(sep)\
 	)
+	if [ -f $(STAGING_DIR)/packages/$(STAGING_FILES_LIST) ]; then \
+		$(SCRIPT_DIR)/clean-package.sh \
+			"$(STAGING_DIR)/packages/$(STAGING_FILES_LIST)" \
+			"$(STAGING_DIR)"; \
+	fi
 	if [ -d $(TMP_DIR)/stage-$(PKG_NAME) ]; then \
 		(cd $(TMP_DIR)/stage-$(PKG_NAME); find ./ > $(TMP_DIR)/stage-$(PKG_NAME).files); \
 		$(call locked, \
@@ -207,7 +220,7 @@ define Package/$(1)/description
 endef
 endif
 
-  $(foreach FIELD, TITLE CATEGORY PRIORITY SECTION VERSION,
+  $(foreach FIELD, TITLE CATEGORY SECTION VERSION,
     ifeq ($($(FIELD)),)
       $$(error Package/$(1) is missing the $(FIELD) field)
     endif
@@ -242,6 +255,14 @@ Build/Install=$(if $(PKG_INSTALL),$(call Build/Install/Default,))
 Build/Dist=$(call Build/Dist/Default,)
 Build/DistCheck=$(call Build/DistCheck/Default,)
 
+.NOTPARALLEL:
+
+.PHONY: prepare-package-install
+prepare-package-install:
+	@mkdir -p $(PKG_INFO_DIR)
+	@touch $(PKG_INSTALL_STAMP).clean
+	@echo "$(filter-out essential,$(PKG_FLAGS))" > $(PKG_INSTALL_STAMP).flags
+
 $(PACKAGE_DIR):
 	mkdir -p $@
 	
@@ -249,8 +270,8 @@ dumpinfo:
 download:
 prepare:
 configure:
-compile:
-install:
+compile: prepare-package-install
+install: compile
 clean-staging: FORCE
 	rm -f $(STAMP_INSTALLED)
 	@-(\

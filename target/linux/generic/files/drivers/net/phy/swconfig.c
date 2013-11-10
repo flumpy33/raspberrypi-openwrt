@@ -23,6 +23,7 @@
 #include <linux/capability.h>
 #include <linux/skbuff.h>
 #include <linux/switch.h>
+#include <linux/of.h>
 
 //#define DEBUG 1
 #ifdef DEBUG
@@ -376,17 +377,21 @@ swconfig_dump_attr(struct swconfig_callback *cb, void *arg)
 	int id = cb->args[0];
 	void *hdr;
 
-	hdr = genlmsg_put(msg, info->snd_pid, info->snd_seq, &switch_fam,
+	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq, &switch_fam,
 			NLM_F_MULTI, SWITCH_CMD_NEW_ATTR);
 	if (IS_ERR(hdr))
 		return -1;
 
-	NLA_PUT_U32(msg, SWITCH_ATTR_OP_ID, id);
-	NLA_PUT_U32(msg, SWITCH_ATTR_OP_TYPE, op->type);
-	NLA_PUT_STRING(msg, SWITCH_ATTR_OP_NAME, op->name);
+	if (nla_put_u32(msg, SWITCH_ATTR_OP_ID, id))
+		goto nla_put_failure;
+	if (nla_put_u32(msg, SWITCH_ATTR_OP_TYPE, op->type))
+		goto nla_put_failure;
+	if (nla_put_string(msg, SWITCH_ATTR_OP_NAME, op->name))
+		goto nla_put_failure;
 	if (op->description)
-		NLA_PUT_STRING(msg, SWITCH_ATTR_OP_DESCRIPTION,
-			op->description);
+		if (nla_put_string(msg, SWITCH_ATTR_OP_DESCRIPTION,
+			op->description))
+			goto nla_put_failure;
 
 	return genlmsg_end(msg, hdr);
 nla_put_failure:
@@ -711,9 +716,12 @@ swconfig_send_port(struct swconfig_callback *cb, void *arg)
 	if (!p)
 		goto error;
 
-	NLA_PUT_U32(cb->msg, SWITCH_PORT_ID, port->id);
-	if (port->flags & (1 << SWITCH_PORT_FLAG_TAGGED))
-		NLA_PUT_FLAG(cb->msg, SWITCH_PORT_FLAG_TAGGED);
+	if (nla_put_u32(cb->msg, SWITCH_PORT_ID, port->id))
+		goto nla_put_failure;
+	if (port->flags & (1 << SWITCH_PORT_FLAG_TAGGED)) {
+		if (nla_put_flag(cb->msg, SWITCH_PORT_FLAG_TAGGED))
+			goto nla_put_failure;
+	}
 
 	nla_nest_end(cb->msg, p);
 	return 0;
@@ -791,17 +799,19 @@ swconfig_get_attr(struct sk_buff *skb, struct genl_info *info)
 	if (!msg)
 		goto error;
 
-	hdr = genlmsg_put(msg, info->snd_pid, info->snd_seq, &switch_fam,
+	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq, &switch_fam,
 			0, cmd);
 	if (IS_ERR(hdr))
 		goto nla_put_failure;
 
 	switch(attr->type) {
 	case SWITCH_TYPE_INT:
-		NLA_PUT_U32(msg, SWITCH_ATTR_OP_VALUE_INT, val.value.i);
+		if (nla_put_u32(msg, SWITCH_ATTR_OP_VALUE_INT, val.value.i))
+			goto nla_put_failure;
 		break;
 	case SWITCH_TYPE_STRING:
-		NLA_PUT_STRING(msg, SWITCH_ATTR_OP_VALUE_STR, val.value.s);
+		if (nla_put_string(msg, SWITCH_ATTR_OP_VALUE_STR, val.value.s))
+			goto nla_put_failure;
 		break;
 	case SWITCH_TYPE_PORTS:
 		err = swconfig_send_ports(&msg, info,
@@ -835,21 +845,46 @@ static int
 swconfig_send_switch(struct sk_buff *msg, u32 pid, u32 seq, int flags,
 		const struct switch_dev *dev)
 {
+	struct nlattr *p = NULL, *m = NULL;
 	void *hdr;
+	int i;
 
 	hdr = genlmsg_put(msg, pid, seq, &switch_fam, flags,
 			SWITCH_CMD_NEW_ATTR);
 	if (IS_ERR(hdr))
 		return -1;
 
-	NLA_PUT_U32(msg, SWITCH_ATTR_ID, dev->id);
-	NLA_PUT_STRING(msg, SWITCH_ATTR_DEV_NAME, dev->devname);
-	NLA_PUT_STRING(msg, SWITCH_ATTR_ALIAS, dev->alias);
-	NLA_PUT_STRING(msg, SWITCH_ATTR_NAME, dev->name);
-	NLA_PUT_U32(msg, SWITCH_ATTR_VLANS, dev->vlans);
-	NLA_PUT_U32(msg, SWITCH_ATTR_PORTS, dev->ports);
-	NLA_PUT_U32(msg, SWITCH_ATTR_CPU_PORT, dev->cpu_port);
+	if (nla_put_u32(msg, SWITCH_ATTR_ID, dev->id))
+		goto nla_put_failure;
+	if (nla_put_string(msg, SWITCH_ATTR_DEV_NAME, dev->devname))
+		goto nla_put_failure;
+	if (nla_put_string(msg, SWITCH_ATTR_ALIAS, dev->alias))
+		goto nla_put_failure;
+	if (nla_put_string(msg, SWITCH_ATTR_NAME, dev->name))
+		goto nla_put_failure;
+	if (nla_put_u32(msg, SWITCH_ATTR_VLANS, dev->vlans))
+		goto nla_put_failure;
+	if (nla_put_u32(msg, SWITCH_ATTR_PORTS, dev->ports))
+		goto nla_put_failure;
+	if (nla_put_u32(msg, SWITCH_ATTR_CPU_PORT, dev->cpu_port))
+		goto nla_put_failure;
 
+	m = nla_nest_start(msg, SWITCH_ATTR_PORTMAP);
+	if (!m)
+		goto nla_put_failure;
+	for (i = 0; i < dev->ports; i++) {
+		p = nla_nest_start(msg, SWITCH_ATTR_PORTS);
+		if (!p)
+			continue;
+		if (dev->portmap[i].s) {
+			if (nla_put_string(msg, SWITCH_PORTMAP_SEGMENT, dev->portmap[i].s))
+				goto nla_put_failure;
+			if (nla_put_u32(msg, SWITCH_PORTMAP_VIRT, dev->portmap[i].virt))
+				goto nla_put_failure;
+		}
+		nla_nest_end(msg, p);
+	}
+	nla_nest_end(msg, m);
 	return genlmsg_end(msg, hdr);
 nla_put_failure:
 	genlmsg_cancel(msg, hdr);
@@ -867,7 +902,7 @@ static int swconfig_dump_switches(struct sk_buff *skb,
 	list_for_each_entry(dev, &swdevs, dev_list) {
 		if (++idx <= start)
 			continue;
-		if (swconfig_send_switch(skb, NETLINK_CB(cb->skb).pid,
+		if (swconfig_send_switch(skb, NETLINK_CB(cb->skb).portid,
 				cb->nlh->nlmsg_seq, NLM_F_MULTI,
 				dev) < 0)
 			break;
@@ -938,6 +973,49 @@ static struct genl_ops swconfig_ops[] = {
 	}
 };
 
+#ifdef CONFIG_OF
+void
+of_switch_load_portmap(struct switch_dev *dev)
+{
+	struct device_node *port;
+
+	if (!dev->of_node)
+		return;
+
+	for_each_child_of_node(dev->of_node, port) {
+		const __be32 *prop;
+		const char *segment;
+		int size, phys;
+
+		if (!of_device_is_compatible(port, "swconfig,port"))
+			continue;
+
+		if (of_property_read_string(port, "swconfig,segment", &segment))
+			continue;
+
+		prop = of_get_property(port, "swconfig,portmap", &size);
+		if (!prop)
+			continue;
+
+		if (size != (2 * sizeof(*prop))) {
+			pr_err("%s: failed to parse port mapping\n", port->name);
+			continue;
+		}
+
+		phys = be32_to_cpup(prop++);
+		if ((phys < 0) | (phys >= dev->ports)) {
+			pr_err("%s: physical port index out of range\n", port->name);
+			continue;
+		}
+
+		dev->portmap[phys].s = kstrdup(segment, GFP_KERNEL);
+		dev->portmap[phys].virt = be32_to_cpup(prop);
+		pr_debug("Found port: %s, physical: %d, virtual: %d\n",
+			segment, phys, dev->portmap[phys].virt);
+	}
+}
+#endif
+
 int
 register_switch(struct switch_dev *dev, struct net_device *netdev)
 {
@@ -960,6 +1038,12 @@ register_switch(struct switch_dev *dev, struct net_device *netdev)
 				GFP_KERNEL);
 		if (!dev->portbuf)
 			return -ENOMEM;
+		dev->portmap = kzalloc(sizeof(struct switch_portmap) * dev->ports,
+				GFP_KERNEL);
+		if (!dev->portmap) {
+			kfree(dev->portbuf);
+			return -ENOMEM;
+		}
 	}
 	swconfig_defaults_init(dev);
 	mutex_init(&dev->sw_mutex);
@@ -980,6 +1064,11 @@ register_switch(struct switch_dev *dev, struct net_device *netdev)
 		swconfig_unlock();
 		return -ENFILE;
 	}
+
+#ifdef CONFIG_OF
+	if (dev->ports)
+		of_switch_load_portmap(dev);
+#endif
 
 	/* fill device name */
 	snprintf(dev->devname, IFNAMSIZ, SWCONFIG_DEVNAME, i);

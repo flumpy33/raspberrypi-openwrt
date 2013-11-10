@@ -1,10 +1,14 @@
-# Copyright (C) 2006-2010 OpenWrt.org
+# Copyright (C) 2006-2012 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
 #
 
 mainmenu "OpenWrt Configuration"
+
+config MODULES
+	bool
+	default y
 
 config HAVE_DOT_CONFIG
 	bool
@@ -25,7 +29,7 @@ menu "Target Images"
 			default TARGET_INITRAMFS_COMPRESSION_LZMA if TARGET_ar71xx
 			default TARGET_INITRAMFS_COMPRESSION_LZMA if TARGET_ramips
 			default TARGET_INITRAMFS_COMPRESSION_NONE
-			depends TARGET_ROOTFS_INITRAMFS
+			depends on TARGET_ROOTFS_INITRAMFS
 			help
 			  Select ramdisk compression.
 
@@ -74,35 +78,39 @@ menu "Target Images"
 	config TARGET_ROOTFS_EXT4FS
 		bool "ext4"
 		default y if USES_EXT4
-		depends !TARGET_ROOTFS_INITRAMFS
 		help
 		  Ext4 file system with some free space for uml images
 
 	config TARGET_ROOTFS_ISO
 		bool "iso"
 		default n
-		depends TARGET_ROOTFS_INITRAMFS && TARGET_x86
+		depends on TARGET_x86_generic
 		help
 		  Create some bootable ISO image
 
 	config TARGET_ROOTFS_JFFS2
 		bool "jffs2"
 		default y if USES_JFFS2
-		depends !TARGET_ROOTFS_INITRAMFS
 		help
 		  Build a jffs2 root filesystem
+
+	config TARGET_ROOTFS_JFFS2_NAND
+		bool "jffs2 for NAND"
+		default y if USES_JFFS2_NAND
+		depends on USES_JFFS2_NAND
+		help
+		  Build a jffs2 root filesystem for NAND flash
 
 	config TARGET_ROOTFS_SQUASHFS
 		bool "squashfs"
 		default y if USES_SQUASHFS
-		depends !TARGET_ROOTFS_INITRAMFS
 		help
 		  Build a squashfs-lzma root filesystem
 
 	config TARGET_ROOTFS_UBIFS
 		bool "ubifs"
 		default y if USES_UBIFS
-		depends !TARGET_ROOTFS_INITRAMFS && USES_UBIFS
+		depends on USES_UBIFS
 		help
 		  Build a ubifs root filesystem
 
@@ -112,17 +120,24 @@ menu "Target Images"
 
 	config TARGET_ROOTFS_PARTSIZE
 		int "Root filesystem partition size (in MB)"
-		depends X86_GRUB_IMAGES || TARGET_ROOTFS_EXT4FS || TARGET_rb532
+		depends on X86_GRUB_IMAGES || TARGET_ROOTFS_EXT4FS || TARGET_rb532
 		default 48
 		help
-		    Allows you to change the root filesystem partition size
+		  Allows you to change the root filesystem partition size
 
 	config TARGET_ROOTFS_MAXINODE
 		int "Maximum number of inodes in root filesystem"
-		depends TARGET_ROOTFS_EXT4FS
+		depends on TARGET_ROOTFS_EXT4FS
 		default 6000
 		help
-		    Allows you to change the maximum number of inodes in the root filesystem
+		  Allows you to change the maximum number of inodes in the root filesystem
+
+	config TARGET_ROOTFS_RESERVED_PCT
+		int "Percentage of reserved blocks in root filesystem"
+		depends on TARGET_ROOTFS_EXT4FS
+		default 0
+		help
+		  Allows you to change the percentage of reserved blocks in the root filesystem
 
 endmenu
 
@@ -172,7 +187,7 @@ menu "Global build settings"
 		prompt "Remove ipkg/opkg status data files in final images"
 		default n
 		help
-			This removes all ipkg/opkg status data files from the target directory before building the root fs
+		  This removes all ipkg/opkg status data files from the target directory before building the root fs
 
 	config COLLECT_KERNEL_DEBUG
 		bool
@@ -180,8 +195,8 @@ menu "Global build settings"
 		select KERNEL_DEBUG_INFO
 		default n
 		help
-			This collects debugging symbols from the kernel and all compiled modules.
-			Useful for release builds, so that kernel issues can be debugged offline later.
+		  This collects debugging symbols from the kernel and all compiled modules.
+		  Useful for release builds, so that kernel issues can be debugged offline later.
 
 	comment "Kernel build options"
 
@@ -193,16 +208,21 @@ menu "Global build settings"
 		  debugging files into. Enable this option to be able to read and
 		  write to these files.
 
+	config KERNEL_PERF_EVENTS
+		bool
+		default n
+
 	config KERNEL_PROFILING
 		bool "Compile the kernel with profiling enabled"
 		default n
+		select KERNEL_PERF_EVENTS
 		help
 		  Enable the extended profiling support mechanisms used by profilers such
 		  as OProfile.
 
 	config KERNEL_KALLSYMS
 		bool "Compile the kernel with symbol table information"
-		default n
+		default y
 		help
 		  This will give you more information in stack traces from kernel oopses
 
@@ -221,7 +241,7 @@ menu "Global build settings"
 
 	config KERNEL_DEBUG_INFO
 		bool "Compile the kernel with debug information"
-		default n
+		default y
 		select KERNEL_DEBUG_KERNEL
 		help
 		  This will compile your kernel and modules with debug information.
@@ -255,12 +275,20 @@ menu "Global build settings"
 		bool "Compile the kernel with asynchronous IO support"
 		default n
 
+	config KERNEL_DIRECT_IO
+		bool "Compile the kernel with direct IO support"
+		default n
+
 	config KERNEL_MAGIC_SYSRQ
 		bool "Compile the kernel with SysRq support"
 		default y
 
+	config KERNEL_COREDUMP
+		bool
+
 	config KERNEL_ELF_CORE
 		bool "Enable process core dump support"
+		select KERNEL_COREDUMP
 		default y
 
 	config KERNEL_PROVE_LOCKING
@@ -271,6 +299,318 @@ menu "Global build settings"
 	config KERNEL_PRINTK_TIME
 		bool "Enable printk timestamps"
 		default y
+
+	config KERNEL_RELAY
+		bool
+
+	config KERNEL_KEXEC
+		bool "Enable kexec support"
+
+	#
+	# CGROUP support symbols
+	#
+
+	config KERNEL_CGROUPS
+		bool "Enable kernel cgroups"
+		default n
+
+	if KERNEL_CGROUPS
+
+		config KERNEL_CGROUP_DEBUG
+			bool "Example debug cgroup subsystem"
+			default n
+			help
+			  This option enables a simple cgroup subsystem that
+			  exports useful debugging information about the cgroups
+			  framework.
+
+		config KERNEL_FREEZER
+			bool
+			default y if KERNEL_CGROUP_FREEZER
+
+		config KERNEL_CGROUP_FREEZER
+			bool "Freezer cgroup subsystem"
+			default n
+			help
+			  Provides a way to freeze and unfreeze all tasks in a
+			  cgroup.
+
+		config KERNEL_CGROUP_DEVICE
+			bool "Device controller for cgroups"
+			default y
+			help
+			  Provides a cgroup implementing whitelists for devices which
+			  a process in the cgroup can mknod or open.
+
+		config KERNEL_CPUSETS
+			bool "Cpuset support"
+			default n
+			help
+			  This option will let you create and manage CPUSETs which
+			  allow dynamically partitioning a system into sets of CPUs and
+			  Memory Nodes and assigning tasks to run only within those sets.
+			  This is primarily useful on large SMP or NUMA systems.
+
+		config KERNEL_PROC_PID_CPUSET
+			bool "Include legacy /proc/<pid>/cpuset file"
+			default n
+			depends on KERNEL_CPUSETS
+
+		config KERNEL_CGROUP_CPUACCT
+			bool "Simple CPU accounting cgroup subsystem"
+			default n
+			help
+			  Provides a simple Resource Controller for monitoring the
+			  total CPU consumed by the tasks in a cgroup.
+
+		config KERNEL_RESOURCE_COUNTERS
+			bool "Resource counters"
+			default n
+			help
+			  This option enables controller independent resource accounting
+			  infrastructure that works with cgroups.
+
+		config KERNEL_MM_OWNER
+			bool
+			default y if KERNEL_MEMCG
+
+		config KERNEL_MEMCG
+			bool "Memory Resource Controller for Control Groups"
+			default n
+			depends on KERNEL_RESOURCE_COUNTERS
+			help
+			  Provides a memory resource controller that manages both anonymous
+			  memory and page cache. (See Documentation/cgroups/memory.txt)
+
+			  Note that setting this option increases fixed memory overhead
+			  associated with each page of memory in the system. By this,
+			  20(40)bytes/PAGE_SIZE on 32(64)bit system will be occupied by memory
+			  usage tracking struct at boot. Total amount of this is printed out
+			  at boot.
+
+			  Only enable when you're ok with these trade offs and really
+			  sure you need the memory resource controller. Even when you enable
+			  this, you can set "cgroup_disable=memory" at your boot option to
+			  disable memory resource controller and you can avoid overheads.
+			  (and lose benefits of memory resource controller)
+
+			  This config option also selects MM_OWNER config option, which
+			  could in turn add some fork/exit overhead.
+
+		config KERNEL_MEMCG_SWAP
+			bool "Memory Resource Controller Swap Extension"
+			default n
+			depends on KERNEL_MEMCG
+			help
+			  Add swap management feature to memory resource controller. When you
+			  enable this, you can limit mem+swap usage per cgroup. In other words,
+			  when you disable this, memory resource controller has no cares to
+			  usage of swap...a process can exhaust all of the swap. This extension
+			  is useful when you want to avoid exhaustion swap but this itself
+			  adds more overheads and consumes memory for remembering information.
+			  Especially if you use 32bit system or small memory system, please
+			  be careful about enabling this. When memory resource controller
+			  is disabled by boot option, this will be automatically disabled and
+			  there will be no overhead from this. Even when you set this config=y,
+			  if boot option "swapaccount=0" is set, swap will not be accounted.
+			  Now, memory usage of swap_cgroup is 2 bytes per entry. If swap page
+			  size is 4096bytes, 512k per 1Gbytes of swap.
+
+		config KERNEL_MEMCG_SWAP_ENABLED
+			bool "Memory Resource Controller Swap Extension enabled by default"
+			default n
+			depends on KERNEL_MEMCG_SWAP
+			help
+			  Memory Resource Controller Swap Extension comes with its price in
+			  a bigger memory consumption. General purpose distribution kernels
+			  which want to enable the feature but keep it disabled by default
+			  and let the user enable it by swapaccount boot command line
+			  parameter should have this option unselected.
+			  For those who want to have the feature enabled by default should
+			  select this option (if, for some reason, they need to disable it
+			  then swapaccount=0 does the trick).
+
+
+		config KERNEL_MEMCG_KMEM
+			bool "Memory Resource Controller Kernel Memory accounting (EXPERIMENTAL)"
+			default n
+			depends on KERNEL_MEMCG
+			help
+			  The Kernel Memory extension for Memory Resource Controller can limit
+			  the amount of memory used by kernel objects in the system. Those are
+			  fundamentally different from the entities handled by the standard
+			  Memory Controller, which are page-based, and can be swapped. Users of
+			  the kmem extension can use it to guarantee that no group of processes
+			  will ever exhaust kernel resources alone.
+
+		config KERNEL_PERF_EVENTS
+			bool
+			default y if KERNEL_CGROUP_PERF
+
+		config KERNEL_CGROUP_PERF
+			bool "Enable perf_event per-cpu per-container group (cgroup) monitoring"
+			default n
+			help
+			  This option extends the per-cpu mode to restrict monitoring to
+			  threads which belong to the cgroup specified and run on the
+			  designated cpu.
+
+		menuconfig KERNEL_CGROUP_SCHED
+			bool "Group CPU scheduler"
+			default n
+			help
+			  This feature lets CPU scheduler recognize task groups and control CPU
+			  bandwidth allocation to such task groups. It uses cgroups to group
+			  tasks.
+
+		if KERNEL_CGROUP_SCHED
+
+			config KERNEL_FAIR_GROUP_SCHED
+				bool "Group scheduling for SCHED_OTHER"
+				default n
+
+			config KERNEL_CFS_BANDWIDTH
+				bool "CPU bandwidth provisioning for FAIR_GROUP_SCHED"
+				default n
+				depends on KERNEL_FAIR_GROUP_SCHED
+				help
+				  This option allows users to define CPU bandwidth rates (limits) for
+				  tasks running within the fair group scheduler.  Groups with no limit
+				  set are considered to be unconstrained and will run with no
+				  restriction.
+				  See tip/Documentation/scheduler/sched-bwc.txt for more information.
+
+			config KERNEL_RT_GROUP_SCHED
+				bool "Group scheduling for SCHED_RR/FIFO"
+				default n
+				help
+				  This feature lets you explicitly allocate real CPU bandwidth
+				  to task groups. If enabled, it will also make it impossible to
+				  schedule realtime tasks for non-root users until you allocate
+				  realtime bandwidth for them.
+
+		endif
+
+		config KERNEL_BLK_CGROUP
+			bool "Block IO controller"
+			default y
+			help
+			  Generic block IO controller cgroup interface. This is the common
+			  cgroup interface which should be used by various IO controlling
+			  policies.
+
+			  Currently, CFQ IO scheduler uses it to recognize task groups and
+			  control disk bandwidth allocation (proportional time slice allocation)
+			  to such task groups. It is also used by bio throttling logic in
+			  block layer to implement upper limit in IO rates on a device.
+
+			  This option only enables generic Block IO controller infrastructure.
+			  One needs to also enable actual IO controlling logic/policy. For
+			  enabling proportional weight division of disk bandwidth in CFQ, set
+			  CONFIG_CFQ_GROUP_IOSCHED=y; for enabling throttling policy, set
+			  CONFIG_BLK_DEV_THROTTLING=y.
+
+		config KERNEL_DEBUG_BLK_CGROUP
+			bool "Enable Block IO controller debugging"
+			default n
+			depends on KERNEL_BLK_CGROUP
+			help
+			  Enable some debugging help. Currently it exports additional stat
+			  files in a cgroup which can be useful for debugging.
+
+		config KERNEL_NET_CLS_CGROUP
+			bool "Control Group Classifier"
+			default y
+
+		config KERNEL_NETPRIO_CGROUP
+			bool "Network priority cgroup"
+			default y
+
+	endif
+
+	#
+	# Namespace support symbols
+	#
+
+	config KERNEL_NAMESPACES
+		bool "Enable kernel namespaces"
+		default n
+
+	if KERNEL_NAMESPACES
+
+		config KERNEL_UTS_NS
+			bool "UTS namespace"
+			default y
+			help
+			  In this namespace tasks see different info provided
+			  with the uname() system call
+
+		config KERNEL_IPC_NS
+			bool "IPC namespace"
+			default y
+			help
+			  In this namespace tasks work with IPC ids which correspond to
+			  different IPC objects in different namespaces.
+
+		config KERNEL_USER_NS
+			bool "User namespace (EXPERIMENTAL)"
+			default y
+			help
+			  This allows containers, i.e. vservers, to use user namespaces
+			  to provide different user info for different servers.
+
+		config KERNEL_PID_NS
+			bool "PID Namespaces"
+			default y
+			help
+			  Support process id namespaces. This allows having multiple
+			  processes with the same pid as long as they are in different
+			  pid namespaces. This is a building block of containers.
+
+		config KERNEL_NET_NS
+			bool "Network namespace"
+			default y
+			help
+			  Allow user space to create what appear to be multiple instances
+			  of the network stack.
+
+	endif
+
+	#
+	# LXC related symbols
+	#
+
+	config KERNEL_LXC_MISC
+		bool "Enable miscellaneous LXC related options"
+		default n
+
+	if KERNEL_LXC_MISC
+
+		config KERNEL_DEVPTS_MULTIPLE_INSTANCES
+			bool "Support multiple instances of devpts"
+			default y
+			help
+			  Enable support for multiple instances of devpts filesystem.
+			  If you want to have isolated PTY namespaces (eg: in containers),
+			  say Y here. Otherwise, say N. If enabled, each mount of devpts
+			  filesystem with the '-o newinstance' option will create an
+			  independent PTY namespace.
+
+		config KERNEL_POSIX_MQUEUE
+			bool "POSIX Message Queues"
+			default n
+			help
+			  POSIX variant of message queues is a part of IPC. In POSIX message
+			  queues every message has a priority which decides about succession
+			  of receiving it by a process. If you want to compile and run
+			  programs written e.g. for Solaris with use of its POSIX message
+			  queues (functions mq_*) say Y here.
+
+			  POSIX message queues are visible as a filesystem called 'mqueue'
+			  and can be mounted somewhere if you want to do filesystem
+			  operations on message queues.
+
+	endif
 
 	comment "Package build options"
 
@@ -291,32 +631,38 @@ menu "Global build settings"
 	config PKG_BUILD_PARALLEL
 		bool
 		prompt "Compile certain packages parallelized"
-		default n
+		default y
 		help
 		  This adds a -jX option to certain packages that are known to
-		  behave well for parallel build.
+		  behave well for parallel build. By default the package make processes
+		  use the main jobserver, in which case this option only takes effect
+		  when you add -jX to the make command.
 
-		  Note that this may overcommit CPU resources depending on the
+		  If you are unsure, select N.
+
+	config PKG_BUILD_USE_JOBSERVER
+		bool
+		prompt "Use top-level make jobserver for packages"
+		depends on PKG_BUILD_PARALLEL
+		default y
+		help
+		  This passes the main make process jobserver fds to package builds,
+		  enabling full parallelization across different packages
+
+		  Note that disabling this may overcommit CPU resources depending on the
 		  -j level of the main make process, the number of package
 		  submake jobs selected below and the number of actual CPUs present.
 		  Example: If the main make is passed a -j4 and the submake -j
 		  is also set to 4, we may end up with 16 parallel make processes
 		  in the worst case.
 
-		  You get maximum build performance, if you set the package build
-		  jobs to the number of CPUs (cores) available and also start the main
-		  make process with -jX, where X is the number of CPUs (cores).
-		  However, make sure you have enough RAM available for
-		  NR_CPUS to the power of two (NR_CPUS^2) make jobs.
-
-		  If you are unsure, select N.
 
 	config PKG_BUILD_JOBS
 		int
 		prompt "Number of package submake jobs (2-512)"
 		range 2 512
 		default 2
-		depends on PKG_BUILD_PARALLEL
+		depends on PKG_BUILD_PARALLEL && !PKG_BUILD_USE_JOBSERVER
 		help
 		  The number of jobs (-jX) to pass to packages submake.
 
@@ -336,26 +682,12 @@ menu "Global build settings"
 		  Only say Y, if you don't mind fixing broken packages.
 		  Before reporting build bugs, set this to N and re-run the build.
 
-	config TOOLCHAIN_PARALLEL
-		bool
-		prompt "Parallelize the toolchain build (May break build)"
-		depends on PKG_BUILD_PARALLEL
-		depends on BROKEN
-		default n
-		help
-		  Build the toolchain with parallel make jobs.
-		  This speeds up the toolchain build on SMP machines, but may
-		  break the build for certain toolchain versions.
-
-		  If you say Y, toolchain build might break.
-		  Before reporting build bugs, set this to N and re-run the build.
-
 	comment "Stripping options"
 
 	choice
 		prompt "Binary stripping method"
 		default USE_STRIP   if EXTERNAL_TOOLCHAIN
-		default USE_STRIP   if USE_GLIBC || USE_EGLIBC
+		default USE_STRIP   if USE_GLIBC || USE_EGLIBC || USE_MUSL
 		default USE_SSTRIP
 		help
 		  Select the binary stripping method you wish to use.
@@ -373,9 +705,9 @@ menu "Global build settings"
 
 		config USE_SSTRIP
 			bool "sstrip"
-			depends !DEBUG
-			depends !USE_GLIBC
-			depends !USE_EGLIBC
+			depends on !DEBUG
+			depends on !USE_GLIBC
+			depends on !USE_EGLIBC
 			help
 			  This will install binaries stripped using sstrip
 	endchoice
@@ -383,7 +715,7 @@ menu "Global build settings"
 	config STRIP_ARGS
 		string
 		prompt "Strip arguments"
-		depends USE_STRIP
+		depends on USE_STRIP
 		default "--strip-unneeded --remove-section=.comment --remove-section=.note" if DEBUG
 		default "--strip-all"
 		help
@@ -416,7 +748,6 @@ menu "Global build settings"
 
 		config USE_LIBSTDCXX
 			bool "libstdc++"
-
 	endchoice
 
 endmenu
@@ -508,12 +839,23 @@ menuconfig TARGET_OPTIONS
 	config SOFT_FLOAT
 		bool "Use software floating point by default" if TARGET_OPTIONS
 		default y
-		depends on (arm || armeb || powerpc || mipsel || mips) && !HAS_FPU
+		depends on (arm || armeb || powerpc || mipsel || mips || mips64el || mips64) && !HAS_FPU
 		help
 		  If your target CPU does not have a Floating Point Unit (FPU) or a
 		  kernel FPU emulator, but you still wish to support floating point
 		  functions, then everything will need to be compiled with soft floating
 		  point support (-msoft-float).
+
+		  Most people will answer N.
+
+	config USE_MIPS16
+		bool "Build packages with MIPS16 instructions" if TARGET_OPTIONS
+		depends on HAS_MIPS16
+		help
+		  If your target CPU does support the MIPS16 instruction set
+		  and you want to use it for packages, enable this option.
+		  MIPS16 produces smaller binaries thus reducing pressure on
+		  caches and TLB.
 
 		  Most people will answer N.
 

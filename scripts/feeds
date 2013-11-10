@@ -254,8 +254,10 @@ sub list_feed {
 
 sub list {
 	my %opts;
+	my @pkg_list;
+	my %pkg_seen;
 
-	getopts('r:d:sh', \%opts);
+	getopts('r:d:shi', \%opts);
 	if ($opts{h}) {
 		usage();
 		return 0;
@@ -280,6 +282,31 @@ sub list {
 			else {
 				printf "\%-8s \%-8s \%-8s \%s\n", $feed->[1], $feed->[0], $revision, join(", ", @{$feed->[2]});
 			}
+		}
+		return 0;
+	}
+	if ($opts{i}) {
+		get_installed();
+		my $pkg;
+		my $src;
+		foreach my $name (keys %installed) {	
+			$pkg = $installed{$name};
+			$src = $pkg->{src};
+
+			# Skip all seen and installed core packages
+			if (!$pkg_seen{$src} and !is_core_package($src)) {
+				push @pkg_list, ${src};
+				$pkg_seen{${src}} = 1;
+			}
+		}
+
+		my $pkg_version;
+		foreach my $name (sort { lc($a) cmp lc($b) } @pkg_list) {	
+			$pkg = $installed{$name};
+			$pkg_version = $pkg->{version};
+			$pkg_version or $pkg_version = "";
+
+			printf "Installed: $name (%s)\n", ${pkg_version};
 		}
 		return 0;
 	}
@@ -333,6 +360,15 @@ sub lookup_package($$) {
 	return;
 }
 
+sub is_core_package($) {
+	my $package = shift;
+	foreach my $file ("tmp/info/.packageinfo-$package", glob("tmp/info/.packageinfo-*_$package")) {
+		next unless index($file, "tmp/info/.packageinfo-feeds_");
+		return 1 if -s $file;
+	}
+	return 0;
+}
+
 sub install_package {
 	my $feed = shift;
 	my $name = shift;
@@ -342,7 +378,7 @@ sub install_package {
 	$feed or do {
 		$installed{$name} and return 0;
 		# TODO: check if it's already installed within ./package directory
-		$feed_src->{$name} or -d "./package/$name" or warn "WARNING: No feed for package '$name' found, maybe it's already part of the standard packages?\n";
+		$feed_src->{$name} or is_core_package($name) or warn "WARNING: No feed for package '$name' found, maybe it's already part of the standard packages?\n";
 		return 0;
 	};
 
@@ -590,6 +626,7 @@ Commands:
 	list [options]: List feeds, their content and revisions (if installed)
 	Options:
 	    -s :            List of feed names and their URL.
+	    -i :            List non-core installed packages.
 	    -r <feedname>:  List packages of specified feed.
 	    -d <delimiter>: Use specified delimiter to distinguish rows (default: spaces)
 

@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/arch/arm/mach-ixp4xx/ap1000-setup.c
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,153 @@
 +/*
 + * arch/arm/mach-ixp4xx/ap1000-setup.c
 + *
@@ -151,6 +151,7 @@
 +#if defined(CONFIG_PCI)
 +	.dma_zone_size	= SZ_64M,
 +#endif
++	.restart	= ixp4xx_restart,
 +MACHINE_END
 +#endif
 --- a/arch/arm/mach-ixp4xx/ixdp425-pci.c
@@ -159,8 +160,8 @@
  {
  	if (machine_is_ixdp425() || machine_is_ixcdp1100() ||
  			machine_is_ixdp465() || machine_is_kixrp435() ||
--			machine_is_compex())
-+			machine_is_compex() || machine_is_ap1000())
+-			machine_is_compex42x())
++			machine_is_compex42x() || machine_is_ap1000())
  		pci_common_init(&ixdp425_pci);
  	return 0;
  }
@@ -185,7 +186,7 @@
 +++ b/arch/arm/mach-ixp4xx/Makefile
 @@ -23,6 +23,7 @@ obj-pci-$(CONFIG_MACH_PRONGHORN)	+= pron
  obj-pci-$(CONFIG_MACH_SIDEWINDER)	+= sidewinder-pci.o
- obj-pci-$(CONFIG_MACH_COMPEX)		+= ixdp425-pci.o
+ obj-pci-$(CONFIG_MACH_COMPEXWP18)	+= ixdp425-pci.o
  obj-pci-$(CONFIG_MACH_WRT300NV2)		+= wrt300nv2-pci.o
 +obj-pci-$(CONFIG_MACH_AP1000)		+= ixdp425-pci.o
  
@@ -193,7 +194,7 @@
  
 @@ -47,6 +48,7 @@ obj-$(CONFIG_MACH_PRONGHORN)	+= pronghor
  obj-$(CONFIG_MACH_SIDEWINDER)	+= sidewinder-setup.o
- obj-$(CONFIG_MACH_COMPEX)	+= compex-setup.o
+ obj-$(CONFIG_MACH_COMPEXWP18)	+= compex42x-setup.o
  obj-$(CONFIG_MACH_WRT300NV2)	+= wrt300nv2-setup.o
 +obj-$(CONFIG_MACH_AP1000)	+= ap1000-setup.o
  

@@ -200,7 +200,7 @@ struct amba_device adm5120_uart0_device = {
 		.end	= ADM5120_UART0_BASE + ADM5120_UART_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= { ADM5120_IRQ_UART0, -1 },
+	.irq		= { ADM5120_IRQ_UART0, 0 },
 	.periphid	= 0x0041010,
 };
 
@@ -218,7 +218,7 @@ struct amba_device adm5120_uart1_device = {
 		.end	= ADM5120_UART1_BASE + ADM5120_UART_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= { ADM5120_IRQ_UART1, -1 },
+	.irq		= { ADM5120_IRQ_UART1, 0 },
 	.periphid	= 0x0041010,
 };
 
@@ -309,26 +309,6 @@ void __init adm5120_add_device_gpio_leds(unsigned num_leds,
 	adm5120_gpio_leds_data.leds = p;
 
 	platform_device_register(&adm5120_gpio_leds_device);
-}
-
-/*
- * GPIO device
- */
-static struct resource adm5120_gpio_resource[] __initdata = {
-	{
-		.start	= 0x3fffff,
-	},
-};
-
-void __init adm5120_add_device_gpio(u32 disable_mask)
-{
-	if (adm5120_package_pqfp())
-		disable_mask |= 0xf0;
-
-	adm5120_gpio_resource[0].start &= ~disable_mask;
-	platform_device_register_simple("GPIODEV", -1,
-			adm5120_gpio_resource,
-			ARRAY_SIZE(adm5120_gpio_resource));
 }
 
 /*

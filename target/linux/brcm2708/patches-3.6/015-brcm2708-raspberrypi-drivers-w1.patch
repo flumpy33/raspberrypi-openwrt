@@ -1,0 +1,795 @@
+--- a/drivers/w1/masters/w1-gpio.c
++++ b/drivers/w1/masters/w1-gpio.c
+@@ -18,6 +18,9 @@
+ #include "../w1.h"
+ #include "../w1_int.h"
+ 
++static int w1_gpio_pullup = 0;
++module_param_named(pullup, w1_gpio_pullup, int, 0);
++
+ static void w1_gpio_write_bit_dir(void *data, u8 bit)
+ {
+ 	struct w1_gpio_platform_data *pdata = data;
+@@ -42,6 +45,16 @@ static u8 w1_gpio_read_bit(void *data)
+ 	return gpio_get_value(pdata->pin) ? 1 : 0;
+ }
+ 
++static void w1_gpio_bitbang_pullup(void *data, u8 on)
++{
++	struct w1_gpio_platform_data *pdata = data;
++
++	if (on)
++		gpio_direction_output(pdata->pin, 1);
++	else
++		gpio_direction_input(pdata->pin);
++}
++
+ static int __init w1_gpio_probe(struct platform_device *pdev)
+ {
+ 	struct w1_bus_master *master;
+@@ -70,6 +83,13 @@ static int __init w1_gpio_probe(struct platform_device *pdev)
+ 		master->write_bit = w1_gpio_write_bit_dir;
+ 	}
+ 
++	if (w1_gpio_pullup)
++		if (pdata->is_open_drain)
++			printk(KERN_ERR "w1-gpio 'pullup' option "
++			       "doesn't work with open drain GPIO\n");
++		else
++			master->bitbang_pullup = w1_gpio_bitbang_pullup;
++
+ 	err = w1_add_master_device(master);
+ 	if (err)
+ 		goto free_gpio;
+@@ -81,9 +101,9 @@ static int __init w1_gpio_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
+- free_gpio:
++free_gpio:
+ 	gpio_free(pdata->pin);
+- free_master:
++free_master:
+ 	kfree(master);
+ 
+ 	return err;
+@@ -133,10 +153,10 @@ static int w1_gpio_resume(struct platform_device *pdev)
+ 
+ static struct platform_driver w1_gpio_driver = {
+ 	.driver = {
+-		.name	= "w1-gpio",
+-		.owner	= THIS_MODULE,
+-	},
+-	.remove	= __exit_p(w1_gpio_remove),
++		   .name = "w1-gpio",
++		   .owner = THIS_MODULE,
++		   },
++	.remove = __exit_p(w1_gpio_remove),
+ 	.suspend = w1_gpio_suspend,
+ 	.resume = w1_gpio_resume,
+ };
+--- a/drivers/w1/w1.c
++++ b/drivers/w1/w1.c
+@@ -931,7 +931,8 @@ void w1_search(struct w1_master *dev, u8 search_type, w1_slave_found_callback cb
+ 			tmp64 = (triplet_ret >> 2);
+ 			rn |= (tmp64 << i);
+ 
+-			if (kthread_should_stop()) {
++			/* ensure we're called from kthread and not by netlink callback */
++			if (!dev->priv && kthread_should_stop()) {
+ 				mutex_unlock(&dev->bus_mutex);
+ 				dev_dbg(&dev->dev, "Abort w1_search\n");
+ 				return;
+--- a/drivers/w1/w1.h
++++ b/drivers/w1/w1.h
+@@ -22,16 +22,11 @@
+ #ifndef __W1_H
+ #define __W1_H
+ 
+-struct w1_reg_num
+-{
++struct w1_reg_num {
+ #if defined(__LITTLE_ENDIAN_BITFIELD)
+-	__u64	family:8,
+-		id:48,
+-		crc:8;
++	__u64 family:8, id:48, crc:8;
+ #elif defined(__BIG_ENDIAN_BITFIELD)
+-	__u64	crc:8,
+-		id:48,
+-		family:8;
++	__u64 crc:8, id:48, family:8;
+ #else
+ #error "Please fix <asm/byteorder.h>"
+ #endif
+@@ -59,26 +54,24 @@ struct w1_reg_num
+ 
+ #define W1_SLAVE_ACTIVE		0
+ 
+-struct w1_slave
+-{
+-	struct module		*owner;
+-	unsigned char		name[W1_MAXNAMELEN];
+-	struct list_head	w1_slave_entry;
+-	struct w1_reg_num	reg_num;
+-	atomic_t		refcnt;
+-	u8			rom[9];
+-	u32			flags;
+-	int			ttl;
+-
+-	struct w1_master	*master;
+-	struct w1_family	*family;
+-	void			*family_data;
+-	struct device		dev;
+-	struct completion	released;
++struct w1_slave {
++	struct module *owner;
++	unsigned char name[W1_MAXNAMELEN];
++	struct list_head w1_slave_entry;
++	struct w1_reg_num reg_num;
++	atomic_t refcnt;
++	u8 rom[9];
++	u32 flags;
++	int ttl;
++
++	struct w1_master *master;
++	struct w1_family *family;
++	void *family_data;
++	struct device dev;
++	struct completion released;
+ };
+ 
+-typedef void (*w1_slave_found_callback)(struct w1_master *, u64);
+-
++typedef void (*w1_slave_found_callback) (struct w1_master *, u64);
+ 
+ /**
+  * Note: read_bit and write_bit are very low level functions and should only
+@@ -87,19 +80,18 @@ typedef void (*w1_slave_found_callback)(struct w1_master *, u64);
+  * Either define read_bit and write_bit OR define, at minimum, touch_bit and
+  * reset_bus.
+  */
+-struct w1_bus_master
+-{
++struct w1_bus_master {
+ 	/** the first parameter in all the functions below */
+-	void		*data;
++	void *data;
+ 
+ 	/**
+ 	 * Sample the line level
+ 	 * @return the level read (0 or 1)
+ 	 */
+-	u8		(*read_bit)(void *);
++	 u8(*read_bit) (void *);
+ 
+ 	/** Sets the line level */
+-	void		(*write_bit)(void *, u8);
++	void (*write_bit) (void *, u8);
+ 
+ 	/**
+ 	 * touch_bit is the lowest-level function for devices that really
+@@ -108,96 +100,103 @@ struct w1_bus_master
+ 	 * touch_bit(1) = write-1 / read cycle
+ 	 * @return the bit read (0 or 1)
+ 	 */
+-	u8		(*touch_bit)(void *, u8);
++	 u8(*touch_bit) (void *, u8);
+ 
+ 	/**
+ 	 * Reads a bytes. Same as 8 touch_bit(1) calls.
+ 	 * @return the byte read
+ 	 */
+-	u8		(*read_byte)(void *);
++	 u8(*read_byte) (void *);
+ 
+ 	/**
+ 	 * Writes a byte. Same as 8 touch_bit(x) calls.
+ 	 */
+-	void		(*write_byte)(void *, u8);
++	void (*write_byte) (void *, u8);
+ 
+ 	/**
+ 	 * Same as a series of read_byte() calls
+ 	 * @return the number of bytes read
+ 	 */
+-	u8		(*read_block)(void *, u8 *, int);
++	 u8(*read_block) (void *, u8 *, int);
+ 
+ 	/** Same as a series of write_byte() calls */
+-	void		(*write_block)(void *, const u8 *, int);
++	void (*write_block) (void *, const u8 *, int);
+ 
+ 	/**
+ 	 * Combines two reads and a smart write for ROM searches
+ 	 * @return bit0=Id bit1=comp_id bit2=dir_taken
+ 	 */
+-	u8		(*triplet)(void *, u8);
++	 u8(*triplet) (void *, u8);
+ 
+ 	/**
+ 	 * long write-0 with a read for the presence pulse detection
+ 	 * @return -1=Error, 0=Device present, 1=No device present
+ 	 */
+-	u8		(*reset_bus)(void *);
++	 u8(*reset_bus) (void *);
+ 
+ 	/**
+ 	 * Put out a strong pull-up pulse of the specified duration.
+ 	 * @return -1=Error, 0=completed
+ 	 */
+-	u8		(*set_pullup)(void *, int);
++	 u8(*set_pullup) (void *, int);
++
++	/**
++	 * Turns the pullup on/off in bitbanging mode, takes an on/off argument.
++	 * @return -1=Error, 0=completed
++	 */
++	void (*bitbang_pullup) (void *, u8);
+ 
+ 	/** Really nice hardware can handles the different types of ROM search
+ 	 *  w1_master* is passed to the slave found callback.
+ 	 */
+-	void		(*search)(void *, struct w1_master *,
+-		u8, w1_slave_found_callback);
++	void (*search) (void *, struct w1_master *,
++			u8, w1_slave_found_callback);
+ };
+ 
+-struct w1_master
+-{
+-	struct list_head	w1_master_entry;
+-	struct module		*owner;
+-	unsigned char		name[W1_MAXNAMELEN];
+-	struct list_head	slist;
+-	int			max_slave_count, slave_count;
+-	unsigned long		attempts;
+-	int			slave_ttl;
+-	int			initialized;
+-	u32			id;
+-	int			search_count;
+-
+-	atomic_t		refcnt;
+-
+-	void			*priv;
+-	int			priv_size;
++struct w1_master {
++	struct list_head w1_master_entry;
++	struct module *owner;
++	unsigned char name[W1_MAXNAMELEN];
++	struct list_head slist;
++	int max_slave_count, slave_count;
++	unsigned long attempts;
++	int slave_ttl;
++	int initialized;
++	u32 id;
++	int search_count;
++
++	atomic_t refcnt;
++
++	void *priv;
++	int priv_size;
+ 
+ 	/** 5V strong pullup enabled flag, 1 enabled, zero disabled. */
+-	int			enable_pullup;
++	int enable_pullup;
+ 	/** 5V strong pullup duration in milliseconds, zero disabled. */
+-	int			pullup_duration;
++	int pullup_duration;
+ 
+-	struct task_struct	*thread;
+-	struct mutex		mutex;
+-	struct mutex		bus_mutex;
++	struct task_struct *thread;
++	struct mutex mutex;
++	struct mutex bus_mutex;
+ 
+-	struct device_driver	*driver;
+-	struct device		dev;
++	struct device_driver *driver;
++	struct device dev;
+ 
+-	struct w1_bus_master	*bus_master;
++	struct w1_bus_master *bus_master;
+ 
+-	u32			seq;
++	u32 seq;
+ };
+ 
+ int w1_create_master_attributes(struct w1_master *);
+ void w1_destroy_master_attributes(struct w1_master *master);
+-void w1_search(struct w1_master *dev, u8 search_type, w1_slave_found_callback cb);
+-void w1_search_devices(struct w1_master *dev, u8 search_type, w1_slave_found_callback cb);
++void w1_search(struct w1_master *dev, u8 search_type,
++	       w1_slave_found_callback cb);
++void w1_search_devices(struct w1_master *dev, u8 search_type,
++		       w1_slave_found_callback cb);
+ struct w1_slave *w1_search_slave(struct w1_reg_num *id);
+ void w1_slave_found(struct w1_master *dev, u64 rn);
+ void w1_search_process_cb(struct w1_master *dev, u8 search_type,
+-	w1_slave_found_callback cb);
++			  w1_slave_found_callback cb);
+ struct w1_master *w1_search_master_id(u32 id);
+ 
+ /* Disconnect and reconnect devices in the given family.  Used for finding
+@@ -220,17 +219,17 @@ int w1_reset_select_slave(struct w1_slave *sl);
+ int w1_reset_resume_command(struct w1_master *);
+ void w1_next_pullup(struct w1_master *, int);
+ 
+-static inline struct w1_slave* dev_to_w1_slave(struct device *dev)
++static inline struct w1_slave *dev_to_w1_slave(struct device *dev)
+ {
+ 	return container_of(dev, struct w1_slave, dev);
+ }
+ 
+-static inline struct w1_slave* kobj_to_w1_slave(struct kobject *kobj)
++static inline struct w1_slave *kobj_to_w1_slave(struct kobject *kobj)
+ {
+ 	return dev_to_w1_slave(container_of(kobj, struct device, kobj));
+ }
+ 
+-static inline struct w1_master* dev_to_w1_master(struct device *dev)
++static inline struct w1_master *dev_to_w1_master(struct device *dev)
+ {
+ 	return container_of(dev, struct w1_master, dev);
+ }
+--- a/drivers/w1/w1_int.c
++++ b/drivers/w1/w1_int.c
+@@ -32,15 +32,15 @@
+ #include "w1_netlink.h"
+ #include "w1_int.h"
+ 
+-static int w1_search_count = -1; /* Default is continual scan */
++static int w1_search_count = -1;	/* Default is continual scan */
+ module_param_named(search_count, w1_search_count, int, 0);
+ 
+ static int w1_enable_pullup = 1;
+ module_param_named(enable_pullup, w1_enable_pullup, int, 0);
+ 
+-static struct w1_master * w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
+-				       struct device_driver *driver,
+-				       struct device *device)
++static struct w1_master *w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
++				      struct device_driver *driver,
++				      struct device *device)
+ {
+ 	struct w1_master *dev;
+ 	int err;
+@@ -48,26 +48,27 @@ static struct w1_master * w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
+ 	/*
+ 	 * We are in process context(kernel thread), so can sleep.
+ 	 */
+-	dev = kzalloc(sizeof(struct w1_master) + sizeof(struct w1_bus_master), GFP_KERNEL);
++	dev =
++	    kzalloc(sizeof(struct w1_master) + sizeof(struct w1_bus_master),
++		    GFP_KERNEL);
+ 	if (!dev) {
+ 		printk(KERN_ERR
+-			"Failed to allocate %zd bytes for new w1 device.\n",
+-			sizeof(struct w1_master));
++		       "Failed to allocate %zd bytes for new w1 device.\n",
++		       sizeof(struct w1_master));
+ 		return NULL;
+ 	}
+ 
+-
+ 	dev->bus_master = (struct w1_bus_master *)(dev + 1);
+ 
+-	dev->owner		= THIS_MODULE;
+-	dev->max_slave_count	= slave_count;
+-	dev->slave_count	= 0;
+-	dev->attempts		= 0;
+-	dev->initialized	= 0;
+-	dev->id			= id;
+-	dev->slave_ttl		= slave_ttl;
+-	dev->search_count	= w1_search_count;
+-	dev->enable_pullup	= w1_enable_pullup;
++	dev->owner = THIS_MODULE;
++	dev->max_slave_count = slave_count;
++	dev->slave_count = 0;
++	dev->attempts = 0;
++	dev->initialized = 0;
++	dev->id = id;
++	dev->slave_ttl = slave_ttl;
++	dev->search_count = w1_search_count;
++	dev->enable_pullup = w1_enable_pullup;
+ 
+ 	/* 1 for w1_process to decrement
+ 	 * 1 for __w1_remove_master_device to decrement
+@@ -89,7 +90,8 @@ static struct w1_master * w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
+ 
+ 	err = device_register(&dev->dev);
+ 	if (err) {
+-		printk(KERN_ERR "Failed to register master device. err=%d\n", err);
++		printk(KERN_ERR "Failed to register master device. err=%d\n",
++		       err);
+ 		memset(dev, 0, sizeof(struct w1_master));
+ 		kfree(dev);
+ 		dev = NULL;
+@@ -110,23 +112,25 @@ int w1_add_master_device(struct w1_bus_master *master)
+ 	struct w1_netlink_msg msg;
+ 	int id, found;
+ 
+-        /* validate minimum functionality */
+-        if (!(master->touch_bit && master->reset_bus) &&
+-            !(master->write_bit && master->read_bit) &&
++	/* validate minimum functionality */
++	if (!(master->touch_bit && master->reset_bus) &&
++	    !(master->write_bit && master->read_bit) &&
+ 	    !(master->write_byte && master->read_byte && master->reset_bus)) {
+ 		printk(KERN_ERR "w1_add_master_device: invalid function set\n");
+-		return(-EINVAL);
+-        }
+-	/* While it would be electrically possible to make a device that
+-	 * generated a strong pullup in bit bang mode, only hardware that
+-	 * controls 1-wire time frames are even expected to support a strong
+-	 * pullup.  w1_io.c would need to support calling set_pullup before
+-	 * the last write_bit operation of a w1_write_8 which it currently
+-	 * doesn't.
+-	 */
++		return (-EINVAL);
++	}
++
++	/* bitbanging hardware uses bitbang_pullup, other hardware uses set_pullup
++	 * and takes care of timing itself */
+ 	if (!master->write_byte && !master->touch_bit && master->set_pullup) {
+ 		printk(KERN_ERR "w1_add_master_device: set_pullup requires "
+-			"write_byte or touch_bit, disabling\n");
++		       "write_byte or touch_bit, disabling\n");
++		master->set_pullup = NULL;
++	}
++
++	if (master->set_pullup && master->bitbang_pullup) {
++		printk(KERN_ERR "w1_add_master_device: set_pullup should not "
++		       "be set when bitbang_pullup is used, disabling\n");
+ 		master->set_pullup = NULL;
+ 	}
+ 
+@@ -146,13 +150,13 @@ int w1_add_master_device(struct w1_bus_master *master)
+ 	} while (found);
+ 
+ 	dev = w1_alloc_dev(id, w1_max_slave_count, w1_max_slave_ttl,
+-		&w1_master_driver, &w1_master_device);
++			   &w1_master_driver, &w1_master_device);
+ 	if (!dev) {
+ 		mutex_unlock(&w1_mlock);
+ 		return -ENOMEM;
+ 	}
+ 
+-	retval =  w1_create_master_attributes(dev);
++	retval = w1_create_master_attributes(dev);
+ 	if (retval) {
+ 		mutex_unlock(&w1_mlock);
+ 		goto err_out_free_dev;
+@@ -166,8 +170,7 @@ int w1_add_master_device(struct w1_bus_master *master)
+ 	if (IS_ERR(dev->thread)) {
+ 		retval = PTR_ERR(dev->thread);
+ 		dev_err(&dev->dev,
+-			 "Failed to create new kernel thread. err=%d\n",
+-			 retval);
++			"Failed to create new kernel thread. err=%d\n", retval);
+ 		mutex_unlock(&w1_mlock);
+ 		goto err_out_rm_attr;
+ 	}
+@@ -182,7 +185,7 @@ int w1_add_master_device(struct w1_bus_master *master)
+ 
+ 	return 0;
+ 
+-#if 0 /* Thread cleanup code, not required currently. */
++#if 0				/* Thread cleanup code, not required currently. */
+ err_out_kill_thread:
+ 	kthread_stop(dev->thread);
+ #endif
+@@ -207,14 +210,15 @@ void __w1_remove_master_device(struct w1_master *dev)
+ 
+ 	mutex_lock(&dev->mutex);
+ 	list_for_each_entry_safe(sl, sln, &dev->slist, w1_slave_entry)
+-		w1_slave_detach(sl);
++	    w1_slave_detach(sl);
+ 	w1_destroy_master_attributes(dev);
+ 	mutex_unlock(&dev->mutex);
+ 	atomic_dec(&dev->refcnt);
+ 
+ 	while (atomic_read(&dev->refcnt)) {
+-		dev_info(&dev->dev, "Waiting for %s to become free: refcnt=%d.\n",
+-				dev->name, atomic_read(&dev->refcnt));
++		dev_info(&dev->dev,
++			 "Waiting for %s to become free: refcnt=%d.\n",
++			 dev->name, atomic_read(&dev->refcnt));
+ 
+ 		if (msleep_interruptible(1000))
+ 			flush_signals(current);
+--- a/drivers/w1/w1_io.c
++++ b/drivers/w1/w1_io.c
+@@ -43,14 +43,15 @@ static u8 w1_crc8_table[] = {
+ 	219, 133, 103, 57, 186, 228, 6, 88, 25, 71, 165, 251, 120, 38, 196, 154,
+ 	101, 59, 217, 135, 4, 90, 184, 230, 167, 249, 27, 69, 198, 152, 122, 36,
+ 	248, 166, 68, 26, 153, 199, 37, 123, 58, 100, 134, 216, 91, 5, 231, 185,
+-	140, 210, 48, 110, 237, 179, 81, 15, 78, 16, 242, 172, 47, 113, 147, 205,
+-	17, 79, 173, 243, 112, 46, 204, 146, 211, 141, 111, 49, 178, 236, 14, 80,
+-	175, 241, 19, 77, 206, 144, 114, 44, 109, 51, 209, 143, 12, 82, 176, 238,
+-	50, 108, 142, 208, 83, 13, 239, 177, 240, 174, 76, 18, 145, 207, 45, 115,
+-	202, 148, 118, 40, 171, 245, 23, 73, 8, 86, 180, 234, 105, 55, 213, 139,
+-	87, 9, 235, 181, 54, 104, 138, 212, 149, 203, 41, 119, 244, 170, 72, 22,
+-	233, 183, 85, 11, 136, 214, 52, 106, 43, 117, 151, 201, 74, 20, 246, 168,
+-	116, 42, 200, 150, 21, 75, 169, 247, 182, 232, 10, 84, 215, 137, 107, 53
++	140, 210, 48, 110, 237, 179, 81, 15, 78, 16, 242, 172, 47, 113, 147,
++	205, 17, 79, 173, 243, 112, 46, 204, 146, 211, 141, 111, 49, 178,
++	236, 14, 80, 175, 241, 19, 77, 206, 144, 114, 44, 109, 51, 209, 143,
++	12, 82, 176, 238, 50, 108, 142, 208, 83, 13, 239, 177, 240, 174, 76,
++	18, 145, 207, 45, 115, 202, 148, 118, 40, 171, 245, 23, 73, 8, 86,
++	180, 234, 105, 55, 213, 139, 87, 9, 235, 181, 54, 104, 138, 212,
++	149, 203, 41, 119, 244, 170, 72, 22, 233, 183, 85, 11, 136, 214, 52,
++	106, 43, 117, 151, 201, 74, 20, 246, 168, 116, 42, 200, 150, 21, 75,
++	169, 247, 182, 232, 10, 84, 215, 137, 107, 53
+ };
+ 
+ static void w1_delay(unsigned long tm)
+@@ -84,7 +85,8 @@ static void w1_write_bit(struct w1_master *dev, int bit)
+ {
+ 	unsigned long flags = 0;
+ 
+-	if(w1_disable_irqs) local_irq_save(flags);
++	if (w1_disable_irqs)
++		local_irq_save(flags);
+ 
+ 	if (bit) {
+ 		dev->bus_master->write_bit(dev->bus_master->data, 0);
+@@ -98,7 +100,8 @@ static void w1_write_bit(struct w1_master *dev, int bit)
+ 		w1_delay(10);
+ 	}
+ 
+-	if(w1_disable_irqs) local_irq_restore(flags);
++	if (w1_disable_irqs)
++		local_irq_restore(flags);
+ }
+ 
+ /**
+@@ -111,9 +114,9 @@ static void w1_write_bit(struct w1_master *dev, int bit)
+ static void w1_pre_write(struct w1_master *dev)
+ {
+ 	if (dev->pullup_duration &&
+-		dev->enable_pullup && dev->bus_master->set_pullup) {
++	    dev->enable_pullup && dev->bus_master->set_pullup) {
+ 		dev->bus_master->set_pullup(dev->bus_master->data,
+-			dev->pullup_duration);
++					    dev->pullup_duration);
+ 	}
+ }
+ 
+@@ -127,10 +130,22 @@ static void w1_pre_write(struct w1_master *dev)
+ static void w1_post_write(struct w1_master *dev)
+ {
+ 	if (dev->pullup_duration) {
+-		if (dev->enable_pullup && dev->bus_master->set_pullup)
+-			dev->bus_master->set_pullup(dev->bus_master->data, 0);
+-		else
++		if (dev->enable_pullup) {
++			if (dev->bus_master->set_pullup) {
++				dev->bus_master->set_pullup(dev->
++							    bus_master->data,
++							    0);
++			} else if (dev->bus_master->bitbang_pullup) {
++				dev->bus_master->
++				    bitbang_pullup(dev->bus_master->data, 1);
++				msleep(dev->pullup_duration);
++				dev->bus_master->
++				    bitbang_pullup(dev->bus_master->data, 0);
++			}
++		} else {
+ 			msleep(dev->pullup_duration);
++		}
++
+ 		dev->pullup_duration = 0;
+ 	}
+ }
+@@ -148,8 +163,7 @@ void w1_write_8(struct w1_master *dev, u8 byte)
+ 	if (dev->bus_master->write_byte) {
+ 		w1_pre_write(dev);
+ 		dev->bus_master->write_byte(dev->bus_master->data, byte);
+-	}
+-	else
++	} else
+ 		for (i = 0; i < 8; ++i) {
+ 			if (i == 7)
+ 				w1_pre_write(dev);
+@@ -157,8 +171,8 @@ void w1_write_8(struct w1_master *dev, u8 byte)
+ 		}
+ 	w1_post_write(dev);
+ }
+-EXPORT_SYMBOL_GPL(w1_write_8);
+ 
++EXPORT_SYMBOL_GPL(w1_write_8);
+ 
+ /**
+  * Generates a write-1 cycle and samples the level.
+@@ -196,17 +210,17 @@ static u8 w1_read_bit(struct w1_master *dev)
+  * @param bdir    the bit to write if both id_bit and comp_bit are 0
+  * @return        bit fields - see above
+  */
+-u8 w1_triplet(struct w1_master *dev, int bdir)
++u8 w1_triplet(struct w1_master * dev, int bdir)
+ {
+ 	if (dev->bus_master->triplet)
+ 		return dev->bus_master->triplet(dev->bus_master->data, bdir);
+ 	else {
+-		u8 id_bit   = w1_touch_bit(dev, 1);
++		u8 id_bit = w1_touch_bit(dev, 1);
+ 		u8 comp_bit = w1_touch_bit(dev, 1);
+ 		u8 retval;
+ 
+ 		if (id_bit && comp_bit)
+-			return 0x03;  /* error */
++			return 0x03;	/* error */
+ 
+ 		if (!id_bit && !comp_bit) {
+ 			/* Both bits are valid, take the direction given */
+@@ -231,7 +245,7 @@ u8 w1_triplet(struct w1_master *dev, int bdir)
+  * @param dev     the master device
+  * @return        the byte read
+  */
+-u8 w1_read_8(struct w1_master *dev)
++u8 w1_read_8(struct w1_master * dev)
+ {
+ 	int i;
+ 	u8 res = 0;
+@@ -240,10 +254,11 @@ u8 w1_read_8(struct w1_master *dev)
+ 		res = dev->bus_master->read_byte(dev->bus_master->data);
+ 	else
+ 		for (i = 0; i < 8; ++i)
+-			res |= (w1_touch_bit(dev,1) << i);
++			res |= (w1_touch_bit(dev, 1) << i);
+ 
+ 	return res;
+ }
++
+ EXPORT_SYMBOL_GPL(w1_read_8);
+ 
+ /**
+@@ -253,19 +268,19 @@ EXPORT_SYMBOL_GPL(w1_read_8);
+  * @param buf     pointer to the data to write
+  * @param len     the number of bytes to write
+  */
+-void w1_write_block(struct w1_master *dev, const u8 *buf, int len)
++void w1_write_block(struct w1_master *dev, const u8 * buf, int len)
+ {
+ 	int i;
+ 
+ 	if (dev->bus_master->write_block) {
+ 		w1_pre_write(dev);
+ 		dev->bus_master->write_block(dev->bus_master->data, buf, len);
+-	}
+-	else
++	} else
+ 		for (i = 0; i < len; ++i)
+-			w1_write_8(dev, buf[i]); /* calls w1_pre_write */
++			w1_write_8(dev, buf[i]);	/* calls w1_pre_write */
+ 	w1_post_write(dev);
+ }
++
+ EXPORT_SYMBOL_GPL(w1_write_block);
+ 
+ /**
+@@ -275,7 +290,7 @@ EXPORT_SYMBOL_GPL(w1_write_block);
+  * @param buf     pointer to the data to write
+  * @param len     the number of bytes to write
+  */
+-void w1_touch_block(struct w1_master *dev, u8 *buf, int len)
++void w1_touch_block(struct w1_master *dev, u8 * buf, int len)
+ {
+ 	int i, j;
+ 	u8 tmp;
+@@ -291,6 +306,7 @@ void w1_touch_block(struct w1_master *dev, u8 *buf, int len)
+ 		buf[i] = tmp;
+ 	}
+ }
++
+ EXPORT_SYMBOL_GPL(w1_touch_block);
+ 
+ /**
+@@ -301,13 +317,15 @@ EXPORT_SYMBOL_GPL(w1_touch_block);
+  * @param len     the number of bytes to read
+  * @return        the number of bytes read
+  */
+-u8 w1_read_block(struct w1_master *dev, u8 *buf, int len)
++u8 w1_read_block(struct w1_master *dev, u8 * buf, int len)
+ {
+ 	int i;
+ 	u8 ret;
+ 
+ 	if (dev->bus_master->read_block)
+-		ret = dev->bus_master->read_block(dev->bus_master->data, buf, len);
++		ret =
++		    dev->bus_master->read_block(dev->bus_master->data, buf,
++						len);
+ 	else {
+ 		for (i = 0; i < len; ++i)
+ 			buf[i] = w1_read_8(dev);
+@@ -316,6 +334,7 @@ u8 w1_read_block(struct w1_master *dev, u8 *buf, int len)
+ 
+ 	return ret;
+ }
++
+ EXPORT_SYMBOL_GPL(w1_read_block);
+ 
+ /**
+@@ -329,10 +348,12 @@ int w1_reset_bus(struct w1_master *dev)
+ 	int result;
+ 	unsigned long flags = 0;
+ 
+-	if(w1_disable_irqs) local_irq_save(flags);
++	if (w1_disable_irqs)
++		local_irq_save(flags);
+ 
+ 	if (dev->bus_master->reset_bus)
+-		result = dev->bus_master->reset_bus(dev->bus_master->data) & 0x1;
++		result =
++		    dev->bus_master->reset_bus(dev->bus_master->data) & 0x1;
+ 	else {
+ 		dev->bus_master->write_bit(dev->bus_master->data, 0);
+ 		/* minimum 480, max ? us
+@@ -355,10 +376,12 @@ int w1_reset_bus(struct w1_master *dev)
+ 		msleep(1);
+ 	}
+ 
+-	if(w1_disable_irqs) local_irq_restore(flags);
++	if (w1_disable_irqs)
++		local_irq_restore(flags);
+ 
+ 	return result;
+ }
++
+ EXPORT_SYMBOL_GPL(w1_reset_bus);
+ 
+ u8 w1_calc_crc8(u8 * data, int len)
+@@ -370,14 +393,16 @@ u8 w1_calc_crc8(u8 * data, int len)
+ 
+ 	return crc;
+ }
++
+ EXPORT_SYMBOL_GPL(w1_calc_crc8);
+ 
+-void w1_search_devices(struct w1_master *dev, u8 search_type, w1_slave_found_callback cb)
++void w1_search_devices(struct w1_master *dev, u8 search_type,
++		       w1_slave_found_callback cb)
+ {
+ 	dev->attempts++;
+ 	if (dev->bus_master->search)
+ 		dev->bus_master->search(dev->bus_master->data, dev,
+-			search_type, cb);
++					search_type, cb);
+ 	else
+ 		w1_search(dev, search_type, cb);
+ }
+@@ -398,14 +423,15 @@ int w1_reset_select_slave(struct w1_slave *sl)
+ 	if (sl->master->slave_count == 1)
+ 		w1_write_8(sl->master, W1_SKIP_ROM);
+ 	else {
+-		u8 match[9] = {W1_MATCH_ROM, };
+-		u64 rn = le64_to_cpu(*((u64*)&sl->reg_num));
++		u8 match[9] = { W1_MATCH_ROM, };
++		u64 rn = le64_to_cpu(*((u64 *) & sl->reg_num));
+ 
+ 		memcpy(&match[1], &rn, 8);
+ 		w1_write_block(sl->master, match, 9);
+ 	}
+ 	return 0;
+ }
++
+ EXPORT_SYMBOL_GPL(w1_reset_select_slave);
+ 
+ /**
+@@ -432,6 +458,7 @@ int w1_reset_resume_command(struct w1_master *dev)
+ 	w1_write_8(dev, W1_RESUME_CMD);
+ 	return 0;
+ }
++
+ EXPORT_SYMBOL_GPL(w1_reset_resume_command);
+ 
+ /**
+@@ -449,4 +476,5 @@ void w1_next_pullup(struct w1_master *dev, int delay)
+ {
+ 	dev->pullup_duration = delay;
+ }
++
+ EXPORT_SYMBOL_GPL(w1_next_pullup);

@@ -9,11 +9,17 @@ HOST_BUILD_DIR ?= $(BUILD_DIR_HOST)/$(PKG_NAME)$(if $(PKG_VERSION),-$(PKG_VERSIO
 HOST_INSTALL_DIR ?= $(HOST_BUILD_DIR)/host-install
 HOST_BUILD_PARALLEL ?=
 
+ifneq ($(CONFIG_PKG_BUILD_USE_JOBSERVER),)
+  HOST_MAKE_J:=$(if $(MAKE_JOBSERVER),$(MAKE_JOBSERVER) -j)
+else
+  HOST_MAKE_J:=-j$(CONFIG_PKG_BUILD_JOBS)
+endif
+
 ifeq ($(strip $(HOST_BUILD_PARALLEL)),0)
 HOST_JOBS?=-j1
 else
 HOST_JOBS?=$(if $(HOST_BUILD_PARALLEL)$(CONFIG_PKG_DEFAULT_PARALLEL),\
-	$(if $(CONFIG_PKG_BUILD_PARALLEL),-j$(CONFIG_PKG_BUILD_JOBS),-j1),-j1)
+	$(if $(CONFIG_PKG_BUILD_PARALLEL),$(HOST_MAKE_J),-j1),-j1)
 endif
 
 include $(INCLUDE_DIR)/host.mk
@@ -63,7 +69,9 @@ HOST_CONFIGURE_ARGS = \
 	--localstatedir=$(STAGING_DIR_HOST)/var \
 	--sbindir=$(STAGING_DIR_HOST)/bin
 
-HOST_CONFIGURE_CMD = ./configure
+HOST_MAKE_FLAGS =
+
+HOST_CONFIGURE_CMD = $(BASH) ./configure
 
 ifneq ($(HOST_OS),Darwin)
   ifeq ($(CONFIG_BUILD_STATIC_TOOLS),y)
@@ -72,7 +80,7 @@ ifneq ($(HOST_OS),Darwin)
 endif
 
 define Host/Configure/Default
-	(cd $(HOST_BUILD_DIR)/$(3); \
+	$(if $(HOST_CONFIGURE_PARALLEL),+)(cd $(HOST_BUILD_DIR)/$(3); \
 		if [ -x configure ]; then \
 			$(CP) $(SCRIPT_DIR)/config.{guess,sub} $(HOST_BUILD_DIR)/$(3)/ && \
 			$(2) \
@@ -89,7 +97,9 @@ define Host/Configure
 endef
 
 define Host/Compile/Default
-	$(MAKE) $(HOST_JOBS) -C $(HOST_BUILD_DIR) $(1)
+	+$(MAKE) $(HOST_JOBS) -C $(HOST_BUILD_DIR) \
+		$(HOST_MAKE_FLAGS) \
+		$(1)
 endef
 
 define Host/Compile
@@ -130,6 +140,8 @@ define Host/Exports/Default
 endef
 Host/Exports=$(Host/Exports/Default)
 
+.NOTPARALLEL:
+
 ifndef DUMP
   define HostBuild
   $(if $(HOST_QUILT),$(Host/Quilt))
@@ -152,9 +164,17 @@ ifndef DUMP
 	touch $$@
 
   $(call Host/Exports,$(HOST_STAMP_BUILT))
-  ifdef Host/Install
-    host-install: $(if $(STAMP_BUILT),$(HOST_STAMP_BUILT),$(HOST_STAMP_INSTALLED))
-  endif
+  $(HOST_STAMP_BUILT): $(HOST_STAMP_CONFIGURED)
+		$(foreach hook,$(Hooks/HostCompile/Pre),$(call $(hook))$(sep))
+		$(call Host/Compile)
+		$(foreach hook,$(Hooks/HostCompile/Post),$(call $(hook))$(sep))
+		touch $$@
+
+  $(HOST_STAMP_INSTALLED): $(HOST_STAMP_BUILT) $(if $(FORCE_HOST_INSTALL),FORCE)
+		$(call Host/Install)
+		$(foreach hook,$(Hooks/HostInstall/Post),$(call $(hook))$(sep))
+		mkdir -p $$(shell dirname $$@)
+		touch $$@
 
   ifndef STAMP_BUILT
     prepare: host-prepare
@@ -163,31 +183,12 @@ ifndef DUMP
     clean: host-clean
     update: host-update
     refresh: host-refresh
-
-    $(HOST_STAMP_BUILT): $(HOST_STAMP_CONFIGURED)
-		$(foreach hook,$(Hooks/HostCompile/Pre),$(call $(hook))$(sep))
-		$(call Host/Compile)
-		$(foreach hook,$(Hooks/HostCompile/Post),$(call $(hook))$(sep))
-		touch $$@
-
-    $(HOST_STAMP_INSTALLED): $(HOST_STAMP_BUILT) $(if $(FORCE_HOST_INSTALL),FORCE)
-		$(call Host/Install)
-		$(foreach hook,$(Hooks/HostInstall/Post),$(call $(hook))$(sep))
-		mkdir -p $$(shell dirname $$@)
-		touch $$@
-  else
-    $(HOST_STAMP_BUILT): $(HOST_STAMP_CONFIGURED) $(if $(FORCE_HOST_INSTALL),FORCE)
-		$(foreach hook,$(Hooks/HostCompile/Pre),$(call $(hook))$(sep))
-		$(call Host/Compile)
-		$(foreach hook,$(Hooks/HostCompile/Post),$(call $(hook))$(sep))
-		$(call Host/Install)
-		$(foreach hook,$(Hooks/HostInstall/Post),$(call $(hook))$(sep))
-		touch $$@
   endif
+
   host-prepare: $(HOST_STAMP_PREPARED)
   host-configure: $(HOST_STAMP_CONFIGURED)
-  host-compile: $(HOST_STAMP_BUILT)
-  host-install:
+  host-compile: $(HOST_STAMP_BUILT) $(if $(STAMP_BUILT),$(HOST_STAMP_INSTALLED))
+  host-install: $(HOST_STAMP_INSTALLED)
   host-clean: FORCE
 	$(call Host/Clean)
 	$(call Host/Uninstall)

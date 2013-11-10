@@ -5,6 +5,17 @@
 # See /LICENSE for more information.
 #
 
+define Profile/ARCHERC7
+	NAME:=TP-LINK Archer C7
+	PACKAGES:=kmod-usb-core kmod-usb2 kmod-ledtrig-usbdev
+endef
+
+define Profile/ARCHERC7/Description
+	Package set optimized for the TP-LINK Archer C7.
+endef
+$(eval $(call Profile,ARCHERC7))
+
+
 define Profile/TLMR11U
 	NAME:=TP-LINK TL-MR11U
 	PACKAGES:=kmod-usb-core kmod-usb2 kmod-ledtrig-usbdev
@@ -72,6 +83,18 @@ endef
 $(eval $(call Profile,TLWR703))
 
 
+define Profile/TLWR720
+	NAME:=TP-LINK TL-WR720N
+	PACKAGES:=kmod-usb-core kmod-usb2
+endef
+
+
+define Profile/TLWR720/Description
+	Package set optimized for the TP-LINK TL-WR720N.
+endef
+$(eval $(call Profile,TLWR720))
+
+
 define Profile/TLWA701
 	NAME:=TP-LINK TL-WA701N/ND
 	PACKAGES:=
@@ -81,6 +104,36 @@ define Profile/TLWA701/Description
 	Package set optimized for the TP-LINK TL-WA701N/ND.
 endef
 $(eval $(call Profile,TLWA701))
+
+define Profile/TLWA7510
+	NAME:=TP-LINK TL-WA7510N
+	PACKAGES:=
+endef
+
+define Profile/TLWA7510/Description
+	Package set optimized for the TP-LINK TL-WA7510N.
+endef
+$(eval $(call Profile,TLWA7510))
+
+define Profile/TLWA801
+	NAME:=TP-LINK TL-WA801N/ND
+	PACKAGES:=
+endef
+
+define Profile/TLWA801/Description
+	Package set optimized for the TP-LINK TL-WA801N/ND.
+endef
+$(eval $(call Profile,TLWA801))
+
+define Profile/TLWA830
+	NAME:=TP-LINK TL-WA830RE
+	PACKAGES:=
+endef
+
+define Profile/TLWA830/Description
+	Package set optimized for the TP-LINK TL-WA830RE.
+endef
+$(eval $(call Profile,TLWA830))
 
 
 define Profile/TLWA901
@@ -95,12 +148,12 @@ $(eval $(call Profile,TLWA901))
 
 
 define Profile/TLWDR4300
-	NAME:=TP-LINK TL-WDR3600/4300/4310
+	NAME:=TP-LINK TL-WDR3500/3600/4300/4310
 	PACKAGES:=kmod-usb-core kmod-usb2 kmod-ledtrig-usbdev
 endef
 
 define Profile/TLWDR4300/Description
-	Package set optimized for the TP-LINK TL-WDR3600/4300/4310.
+	Package set optimized for the TP-LINK TL-WDR3500/3600/4300/4310.
 endef
 $(eval $(call Profile,TLWDR4300))
 

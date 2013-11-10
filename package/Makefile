@@ -9,22 +9,15 @@ curdir:=package
 
 -include $(TMP_DIR)/.packagedeps
 $(curdir)/builddirs:=$(sort $(package-) $(package-y) $(package-m))
+$(curdir)/builddirs-install:=.
 ifeq ($(SDK),1)
-  $(curdir)/builddirs-install:=.
 else
   $(curdir)/builddirs-default:=. $(sort $(package-y) $(package-m))
   $(curdir)/builddirs-prereq:=. $(sort $(prereq-y) $(prereq-m))
-  $(curdir)/builddirs-install:=. $(filter-out base-files,$(sort $(package-y))) $(filter base-files,$(package-y))
 endif
 ifneq ($(IGNORE_ERRORS),)
   $(curdir)/builddirs-ignore-compile:= $(if $(filter n m y, $(IGNORE_ERRORS)),$(foreach m,$(IGNORE_ERRORS),$(package-$(subst n,,$(m)))),$(package-m) $(package-))
 endif
-
-$(curdir)/install:=$(curdir)/install-cleanup
-
-$(curdir)/cleanup: $(TMP_DIR)/.build
-	- find $(STAGING_DIR_ROOT) -type d | $(XARGS) chmod 0755
-	rm -rf $(TARGET_DIR) $(STAGING_DIR_ROOT)
 
 ifdef CONFIG_USE_MKLIBS
   define mklibs
@@ -61,18 +54,53 @@ ifdef CONFIG_USE_MKLIBS
   endef
 endif
 
-$(curdir)/rootfs-prepare: $(TMP_DIR)/.build
+# where to build (and put) .ipk packages
+OPKG:= \
+  IPKG_TMP=$(TMP_DIR)/ipkg \
+  IPKG_INSTROOT=$(TARGET_DIR) \
+  IPKG_CONF_DIR=$(STAGING_DIR)/etc \
+  IPKG_OFFLINE_ROOT=$(TARGET_DIR) \
+  $(XARGS) $(STAGING_DIR_HOST)/bin/opkg \
+	--offline-root $(TARGET_DIR) \
+	--force-depends \
+	--force-overwrite \
+	--force-postinstall \
+	--force-maintainer \
+	--add-dest root:/ \
+	--add-arch all:100 \
+	--add-arch $(if $(ARCH_PACKAGES),$(ARCH_PACKAGES),$(BOARD)):200
+
+PACKAGE_INSTALL_FILES:= \
+	$(foreach pkg,$(sort $(package-y)), \
+		$(foreach variant, \
+			$(if $(package/$(pkg)/variants), \
+				$(package/$(pkg)/variants), \
+				$(if $(package/$(pkg)/default-variant), \
+					$(package/$(pkg)/default-variant), \
+					default \
+				) \
+			), \
+			$(PKG_INFO_DIR)/$(lastword $(subst /,$(space),$(pkg))).$(variant).install \
+		) \
+	)
+
+$(curdir)/cleanup: $(TMP_DIR)/.build
+	rm -rf $(STAGING_DIR_ROOT)
+
+$(curdir)/install: $(TMP_DIR)/.build
+	- find $(STAGING_DIR_ROOT) -type d | $(XARGS) chmod 0755
+	rm -rf $(TARGET_DIR)
+	[ -d $(TARGET_DIR)/tmp ] || mkdir -p $(TARGET_DIR)/tmp
+	@$(FIND) `sed -e 's|.*|$(PACKAGE_DIR)/&_*.ipk|' $(PACKAGE_INSTALL_FILES)` | sort -u | $(OPKG) install
+	@for file in $(PACKAGE_INSTALL_FILES); do \
+		[ -s $$file.flags ] || continue; \
+		for flag in `cat $$file.flags`; do \
+			$(OPKG) flag $$flag < $$file; \
+		done; \
+	done || true
 	@-$(MAKE) package/preconfig
 	@if [ -d $(TOPDIR)/files ]; then \
-		( cd $(TOPDIR)/files; find -type f ) | \
-			( cd $(TARGET_DIR); while :; do \
-				read FILE; \
-				[ -z "$$FILE" ] && break; \
-				[ -L "$$FILE" ] || continue; \
-				echo "Removing symlink $(TARGET_DIR)/$$FILE"; \
-				rm -f "$$FILE"; \
-			done; ); \
-		$(CP) $(TOPDIR)/files/. $(TARGET_DIR); \
+		$(call file_copy,$(TOPDIR)/files/.,$(TARGET_DIR)); \
 	fi
 	@mkdir -p $(TARGET_DIR)/etc/rc.d
 	@( \
@@ -94,12 +122,13 @@ $(curdir)/index: FORCE
 		gzip -9c Packages > Packages.gz \
 	)
 
+$(curdir)/preconfig:
+
 $(curdir)/flags-install:= -j1
 
 $(eval $(call stampfile,$(curdir),package,prereq,.config))
 $(eval $(call stampfile,$(curdir),package,cleanup,$(TMP_DIR)/.build))
 $(eval $(call stampfile,$(curdir),package,compile,$(TMP_DIR)/.build))
 $(eval $(call stampfile,$(curdir),package,install,$(TMP_DIR)/.build))
-$(eval $(call stampfile,$(curdir),package,rootfs-prepare,$(TMP_DIR)/.build))
 
 $(eval $(call subdir,$(curdir)))

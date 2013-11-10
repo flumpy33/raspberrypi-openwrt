@@ -21,19 +21,6 @@ endef
 
 $(eval $(call KernelPackage,usb-brcm47xx))
 
-define KernelPackage/ssb-gige
-  TITLE:=Broadcom SSB Gigabit Ethernet
-  KCONFIG:=CONFIG_SSB_DRIVER_GIGE=y
-  DEPENDS:=@TARGET_brcm47xx +kmod-tg3
-  SUBMENU:=$(NETWORK_DEVICES_MENU)
-endef
-
-define KernelPackage/ssb-gige/description
- Kernel modules for Broadcom SSB Gigabit Ethernet adapters.
-endef
-
-$(eval $(call KernelPackage,ssb-gige))
-
 
 define KernelPackage/ocf-ubsec-ssb
   TITLE:=BCM5365P IPSec Core driver
@@ -49,3 +36,18 @@ define KernelPackage/ocf-ubsec-ssb/description
 endef
 
 $(eval $(call KernelPackage,ocf-ubsec-ssb))
+
+define KernelPackage/bgmac
+  TITLE:=Broadcom bgmac driver
+  KCONFIG:=CONFIG_BGMAC
+  DEPENDS:=@TARGET_brcm47xx
+  SUBMENU:=$(NETWORK_DEVICES_MENU)
+  FILES:=$(LINUX_DIR)/drivers/net/ethernet/broadcom/bgmac.ko
+  AUTOLOAD:=$(call AutoLoad,19,bgmac)
+endef
+
+define KernelPackage/bgmac/description
+ Kernel modules for Broadcom bgmac Ethernet adapters.
+endef
+
+$(eval $(call KernelPackage,bgmac))

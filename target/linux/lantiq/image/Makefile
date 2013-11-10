@@ -4,16 +4,27 @@
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
 #
+
+# boards missing since devicetree update
+#EASY50712 ARV3527P GIGASX76X ARV4519PW BTHOMEHUBV2B BTHOMEHUBV2BOPENRG
+#WBMR P2601HNFX H201L
+
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
 JFFS2_BLOCKSIZE = 64k 128k 256k
 
-ase_cmdline=-console=ttyLTQ0,115200 rootfstype=squashfs,jffs2
-xway_cmdline=-console=ttyLTQ1,115200 rootfstype=squashfs,jffs2
-falcon_cmdline=-console=ttyLTQ0,115200 rootfstype=squashfs,jffs2
-svip_cmdline=-console=ttyLTQ0,115200 rootfstype=squashfs,jffs2
-sx76x_cmdline=console=ttyLTQ1,115200 rootfstype=squashfs,jffs2
+LOADER_MAKE := $(NO_TRACE_MAKE) -C lzma-loader KDIR=$(KDIR)
+
+define Image/BuildLoader/Template
+	-rm -rf $(KDIR)/lzma-loader
+	$(LOADER_MAKE) LOADER=loader-$(1).$(2)\
+		LZMA_TEXT_START=0x80a00000 \
+		LOADADDR=0x80002000 \
+		LOADER_DATA="$(KDIR)/vmlinux-$(1).lzma" BOARD="$(1)" \
+		compile loader.$(2)
+endef
+
 
 define CompressLzma
   $(STAGING_DIR_HOST)/bin/lzma e $(1) $(2)
@@ -21,7 +32,8 @@ endef
 
 define PatchKernelLzma
 	cp $(KDIR)/vmlinux $(KDIR)/vmlinux-$(1)
-	$(STAGING_DIR_HOST)/bin/patch-cmdline $(KDIR)/vmlinux-$(1) '$(strip $(2))'
+	$(LINUX_DIR)/scripts/dtc/dtc -O dtb -o $(KDIR)/$(1).dtb ../dts/$(1).dts
+	$(STAGING_DIR_HOST)/bin/patch-dtb $(KDIR)/vmlinux-$(1) $(KDIR)/$(1).dtb
 	$(call CompressLzma,$(KDIR)/vmlinux-$(1),$(KDIR)/vmlinux-$(1).lzma)
 endef
 
@@ -70,6 +82,16 @@ define Image/BuildEVA/squashfs
 	$(call prepare_generic_squashfs,$(BIN_DIR)/$(IMG_PREFIX)-$(2)-$(1).image.eva)
 endef
 
+define Image/BuildLoader/squashfs
+	dd if=$(KDIR)/loader-$(2).bin of=$(KDIR)/loader-$(2).bin.padded bs=1536k conv=sync
+	cat $(KDIR)/loader-$(2).bin.padded $(KDIR)/root.$(1) > $(BIN_DIR)/$(IMG_PREFIX)-$(2)-$(1).image
+	$(call prepare_generic_squashfs,$(BIN_DIR)/$(IMG_PREFIX)-$(2)-$(1).image)
+endef
+
+define Image/BuildNANDEVA/jffs2-128k
+	cp $(KDIR)/root.$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(2)-$(1).rootfs
+endef
+
 define Image/Build/jffs2-64k
 	dd if=$(KDIR)/uImage-$(2) of=$(KDIR)/uImage-$(2)-$(1) bs=64k conv=sync
 	cat $(KDIR)/uImage-$(2)-$(1) $(KDIR)/root.$(1) > $(BIN_DIR)/$(IMG_PREFIX)-$(2)-$(1).image
@@ -91,6 +113,13 @@ define Image/BuildKernel/Template
 	$(CP) $(KDIR)/uImage-$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1)-uImage
 endef
 
+define Image/BuildKernelLoader/Template
+	$(call PatchKernelLzma,$(1))
+	$(call Image/BuildLoader/Template,$(1),bin)
+	$(CP) $(KDIR)/loader-$(1).bin $(BIN_DIR)/$(IMG_PREFIX)-$(1)-vmlinux-loader
+	$(CP) $(KDIR)/vmlinux-$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1)-vmlinux
+endef
+
 define Image/BuildKernelEVA/Template
 	$(call PatchKernelLzma,$(1),$(if $(2),$(2) machtype=$(1),))
 	$(call MkImageEVA,$(1))
@@ -103,175 +132,109 @@ define Image/BuildKernelGzip/Template
 	$(CP) $(KDIR)/uImage-$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1)-uImage
 endef
 
-ifeq ($(CONFIG_TARGET_lantiq_danube),y)
 
-Image/BuildKernel/Profile/EASY50712=$(call Image/BuildKernel/Template,EASY50712,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV3527P=$(call Image/BuildKernel/Template,ARV3527P,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV4510PW=$(call Image/BuildKernel/Template,ARV4510PW,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV4518PW=$(call Image/BuildKernel/Template,ARV4518PW,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV4519PW=$(call Image/BuildKernel/Template,ARV4519PW,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV4520PW=$(call Image/BuildKernel/Template,ARV4520PW,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV4525PW=$(call Image/BuildKernel/Template,ARV4525PW,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV7525PW=$(call Image/BuildKernel/Template,ARV7525PW,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV452CPW=$(call Image/BuildKernel/Template,ARV452CPW,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV7518PW=$(call Image/BuildKernel/Template,ARV7518PW,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV752DPW=$(call Image/BuildKernel/Template,ARV752DPW,$(xway_cmdline))
-Image/BuildKernel/Profile/ARV752DPW22=$(call Image/BuildKernel/Template,ARV752DPW22,$(xway_cmdline))
-Image/BuildKernel/Profile/GIGASX76X=$(call Image/BuildKernel/Template,GIGASX76X,$(sx76x_cmdline))
-Image/BuildKernel/Profile/BTHOMEHUBV2B=$(call Image/BuildKernel/Template,BTHOMEHUBV2B,$(xway_cmdline))
-Image/BuildKernel/Profile/BTHOMEHUBV2BOPENRG=$(call Image/BuildKernel/Template,BTHOMEHUBV2BOPENRG,$(xway_cmdline))
+ifeq ($(CONFIG_TARGET_lantiq_falcon),y)
 
-Image/Build/Profile/EASY50712=$(call Image/Build/$(1),$(1),EASY50712)
-Image/Build/Profile/ARV3527P=$(call Image/Build/$(1),$(1),ARV3527P)
-Image/Build/Profile/ARV4510PW=$(call Image/Build/$(1),$(1),ARV4510PW)
-Image/Build/Profile/ARV4518PW=$(call Image/Build/$(1),$(1),ARV4518PW)
-Image/Build/Profile/ARV4519PW=$(call Image/Build/$(1),$(1),ARV4519PW,BRNDA4519,0x12345678,memsize=32)
-Image/Build/Profile/ARV4520PW=$(call Image/Build/$(1),$(1),ARV4520PW,BRNDANUBE,0x12345678,memsize=32)
-Image/Build/Profile/ARV4525PW=$(call Image/Build/$(1),$(1),ARV4525PW,BRNDTW502,0x12345678,memsize=32)
-Image/Build/Profile/ARV7525PW=$(call Image/Build/$(1),$(1),ARV7525PW)
-Image/Build/Profile/ARV452CPW=$(call Image/Build/$(1),$(1),ARV452CPW)
-Image/Build/Profile/ARV7518PW=$(call Image/Build/$(1),$(1),ARV7518PW,BRNDA7519,0x12345678,memsize=64)
-Image/Build/Profile/ARV752DPW=$(call Image/Build/$(1),$(1),ARV752DPW)
-Image/Build/Profile/ARV752DPW22=$(call Image/Build/$(1),$(1),ARV752DPW22)
-Image/Build/Profile/GIGASX76X=$(call Image/Build/$(1),$(1),GIGASX76X)
-Image/Build/Profile/BTHOMEHUBV2B=$(call Image/Build/$(1),$(1),BTHOMEHUBV2B)
-Image/Build/Profile/BTHOMEHUBV2BOPENRG=$(call Image/Build/$(1),$(1),BTHOMEHUBV2BOPENRG)
+Image/BuildKernel/Profile/EASY98000NOR=$(call Image/BuildKernel/Template,EASY98000NOR)
+Image/Build/Profile/EASY98000NOR=$(call Image/Build/$(1),$(1),EASY98000NOR)
 
-define Image/BuildKernel/Profile/Generic
-	$(call Image/BuildKernel/Template,NONE)
-endef
+Image/BuildKernel/Profile/EASY98000SFLASH=$(call Image/BuildKernel/Template,EASY98000SFLASH)
+Image/Build/Profile/EASY98000SFLASH=$(call Image/Build/$(1),$(1),EASY98000SFLASH)
 
-define Image/Build/Profile/Generic
-	$(call Image/Build/$(1),$(1),NONE)
-	$(CP) $(KDIR)/root.$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1).rootfs
-endef
 endif
 
-ifeq ($(CONFIG_TARGET_lantiq_ar9),y)
-Image/BuildKernel/Profile/WBMR=$(call Image/BuildKernel/Template,WBMR,$(xway_cmdline))
-Image/BuildKernel/Profile/DGN3500B=$(call Image/BuildKernel/Template,DGN3500B,$(xway_cmdline))
-Image/BuildKernel/Profile/P2601HNFX=$(call Image/BuildKernel/Template,P2601HNFX,$(xway_cmdline))
-Image/BuildKernel/Profile/H201L=$(call Image/BuildKernel/Template,H201L,$(xway_cmdline))
-Image/BuildKernel/Profile/FRITZ7320=$(call Image/BuildKernelEVA/Template,FRITZ7320,$(xway_cmdline))
 
-Image/Build/Profile/WBMR=$(call Image/Build/$(1),$(1),WBMR)
-Image/Build/Profile/DGN3500B=$(call Image/Build/$(1),$(1),DGN3500B)
-Image/Build/Profile/P2601HNFX=$(call Image/Build/$(1),$(1),P2601HNFX)
-Image/Build/Profile/H201L=$(call Image/Build/$(1),$(1),H201L)
-Image/Build/Profile/FRITZ7320=$(call Image/BuildEVA/$(1),$(1),FRITZ7320)
-
-define Image/BuildKernel/Profile/Generic
-	$(call Image/BuildKernel/Template,NONE)
-endef
-
-define Image/Build/Profile/Generic
-	$(call Image/Build/$(1),$(1),NONE)
-	$(CP) $(KDIR)/root.$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1).rootfs
-endef
-endif
-
-ifeq ($(CONFIG_TARGET_lantiq_falcon)$(CONFIG_TARGET_lantiq_falcon_stable),y)
-
-Image/BuildKernel/Profile/EASY98000=$(call Image/BuildKernel/Template,EASY98000,$(falcon_cmdline))
-Image/BuildKernel/Profile/EASY98020=$(call Image/BuildKernel/Template,EASY98020,$(falcon_cmdline))
-
-Image/Build/Profile/EASY98000=$(call Image/Build/$(1),$(1),EASY98000)
-Image/Build/Profile/EASY98020=$(call Image/Build/$(1),$(1),EASY98020)
-
-define Image/BuildKernel/Profile/Generic
-	$(call Image/BuildKernel/Template,NONE)
-endef
-
-define Image/Build/Profile/Generic
-	$(call Image/Build/$(1),$(1),NONE)
-	$(CP) $(KDIR)/root.$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1).rootfs
-endef
-endif
 
 ifeq ($(CONFIG_TARGET_lantiq_ase),y)
 
-Image/BuildKernel/Profile/EASY50601=$(call Image/BuildKernel/Template,EASY50601,$(ase_cmdline))
-Image/Build/Profile/EASY50601=$(call Image/Build/$(1),$(1),EASY50601)
+Image/BuildKernel/Profile/DGN1000B=$(call Image/BuildKernel/Template,DGN1000B)
+Image/Build/Profile/DGN1000B=$(call Image/Build/$(1),$(1),DGN1000B)
 
-define Image/BuildKernel/Profile/Generic
-	$(call Image/BuildKernel/Template,NONE)
-endef
-
-define Image/Build/Profile/Generic
-	$(call Image/Build/$(1),$(1),NONE)
-	$(CP) $(KDIR)/root.$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1).rootfs
-endef
 endif
 
-ifeq ($(CONFIG_TARGET_lantiq_vr9),y)
-define Image/BuildKernel/Profile/FRITZ3370
-	$(call Image/BuildKernel/Template,FRITZ3370,$(xway_cmdline))
-	$(call Image/BuildKernelEVA/Template,FRITZ3370,$(xway_cmdline))
-endef
 
-Image/Build/Profile/FRITZ3370=$(call Image/Build/$(1),$(1),FRITZ3370)
 
-define Image/BuildKernel/Profile/Generic
-	$(call Image/BuildKernel/Template,NONE)
-endef
+ifeq ($(CONFIG_TARGET_lantiq_xway),y)
 
-define Image/Build/Profile/Generic
-	$(call Image/Build/$(1),$(1),NONE)
-	$(CP) $(KDIR)/root.$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1).rootfs
-endef
+# Danube
+Image/BuildKernel/Profile/EASY50712=$(call Image/BuildKernel/Template,EASY50712)
+Image/Build/Profile/EASY50712=$(call Image/Build/$(1),$(1),EASY50712)
+
+Image/BuildKernel/Profile/ACMP252=$(call Image/BuildKernel/Template,ACMP252)
+Image/Build/Profile/ACMP252=$(call Image/Build/$(1),$(1),ACMP252)
+
+Image/BuildKernel/Profile/ARV4510PW=$(call Image/BuildKernel/Template,ARV4510PW)
+Image/Build/Profile/ARV4510PW=$(call Image/Build/$(1),$(1),ARV4510PW)
+
+Image/BuildKernel/Profile/ARV4525PW=$(call Image/BuildKernel/Template,ARV4525PW)
+Image/Build/Profile/ARV4525PW=$(call Image/Build/$(1),$(1),ARV4525PW)
+
+Image/BuildKernel/Profile/ARV7525PW=$(call Image/BuildKernel/Template,ARV7525PW)
+Image/Build/Profile/ARV7525PW=$(call Image/Build/$(1),$(1),ARV7525PW)
+
+Image/BuildKernel/Profile/ARV4518PWR01=$(call Image/BuildKernel/Template,ARV4518PWR01)
+Image/Build/Profile/ARV4518PWR01=$(call Image/Build/$(1),$(1),ARV4518PWR01)
+
+Image/BuildKernel/Profile/ARV4518PWR01A=$(call Image/BuildKernel/Template,ARV4518PWR01A)
+Image/Build/Profile/ARV4518PWR01A=$(call Image/Build/$(1),$(1),ARV4518PWR01A)
+
+Image/BuildKernel/Profile/ARV4520PW=$(call Image/BuildKernel/Template,ARV4520PW)
+Image/Build/Profile/ARV4520PW=$(call Image/Build/$(1),$(1),ARV4520PW)
+
+Image/BuildKernel/Profile/ARV452CQW=$(call Image/BuildKernel/Template,ARV452CQW)
+Image/Build/Profile/ARV452CQW=$(call Image/Build/$(1),$(1),ARV452CQW)
+
+Image/BuildKernel/Profile/ARV7518PW=$(call Image/BuildKernel/Template,ARV7518PW)
+Image/Build/Profile/ARV7518PW=$(call Image/Build/$(1),$(1),ARV7518PW)
+
+Image/BuildKernel/Profile/ARV752DPW=$(call Image/BuildKernel/Template,ARV752DPW)
+Image/Build/Profile/ARV752DPW=$(call Image/Build/$(1),$(1),ARV752DPW)
+
+Image/BuildKernel/Profile/ARV752DPW22=$(call Image/BuildKernel/Template,ARV752DPW22)
+Image/Build/Profile/ARV752DPW22=$(call Image/Build/$(1),$(1),ARV752DPW22)
+
+
+# AR9
+Image/BuildKernel/Profile/DGN3500=$(call Image/BuildKernel/Template,DGN3500)
+Image/Build/Profile/DGN3500=$(call Image/Build/$(1),$(1),DGN3500)
+
+Image/BuildKernel/Profile/DGN3500B=$(call Image/BuildKernel/Template,DGN3500)
+Image/Build/Profile/DGN3500B=$(call Image/Build/$(1),$(1),DGN3500)
+
+Image/BuildKernel/Profile/WBMRA=$(call Image/BuildKernel/Template,WBMR)
+Image/Build/Profile/WBMRA=$(call Image/Build/$(1),$(1),WBMR)
+
+Image/BuildKernel/Profile/WBMRB=$(call Image/BuildKernel/Template,WBMR)
+Image/Build/Profile/WBMRB=$(call Image/Build/$(1),$(1),WBMR)
+
+Image/BuildKernel/Profile/FRITZ7320=$(call Image/BuildKernelEVA/Template,FRITZ7320)
+Image/Build/Profile/FRITZ7320=$(call Image/BuildEVA/$(1),$(1),FRITZ7320)
+
+
+# VR9
+Image/BuildKernel/Profile/EASY80920NAND=$(call Image/BuildKernel/Template,EASY80920NAND)
+Image/Build/Profile/EASY80920NAND=$(call Image/Build/$(1),$(1),EASY80920NAND)
+
+Image/BuildKernel/Profile/EASY80920NOR=$(call Image/BuildKernel/Template,EASY80920NOR)
+Image/Build/Profile/EASY80920NOR=$(call Image/Build/$(1),$(1),EASY80920NOR)
+
+Image/BuildKernel/Profile/FRITZ3370=$(call Image/BuildKernelEVA/Template,FRITZ3370)
+Image/Build/Profile/FRITZ3370=$(call Image/BuildNANDEVA/$(1),$(1),FRITZ3370)
+
+Image/BuildKernel/Profile/VG3503J=$(call Image/BuildKernelLoader/Template,VG3503J)
+Image/Build/Profile/VG3503J=$(call Image/BuildLoader/$(1),$(1),VG3503J)
+
 endif
+
+
 
 ifeq ($(CONFIG_TARGET_lantiq_svip_be),y)
-define Image/BuildKernel/Profile/EASY33016
-	$(call Image/BuildKernelGzip/Template,EASY33016,$(svip_cmdline))
-endef
 
-define Image/Build/Profile/EASY33016
-	$(call Image/Build/$(1),$(1),EASY33016)
-endef
+Image/BuildKernel/Profile/EASY33016=$(call Image/BuildKernelGzip/Template,EASY33016)
+Image/Build/Profile/EASY33016=$(call Image/Build/$(1),$(1),EASY33016)
 
-define Image/BuildKernel/Profile/EASY336
-	$(call Image/BuildKernelGzip/Template,EASY33016,$(svip_cmdline))
-endef
-
-define Image/Build/Profile/EASY336
-	$(call Image/Build/$(1),$(1),EASY33016)
-endef
-
-define Image/BuildKernel/Profile/Generic
-	$(call Image/BuildKernelGzip/Template,EASY33016,$(svip_cmdline))
-	$(call Image/BuildKernelGzip/Template,EASY336,$(svip_cmdline))
-	$(call Image/BuildKernelGzip/Template,NONE)
-endef
-
-define Image/Build/Profile/Generic
-	$(call Image/Build/$(1),$(1),EASY33016)
-	$(call Image/Build/$(1),$(1),EASY336)
-	$(call Image/Build/$(1),$(1),NONE)
-	$(CP) $(KDIR)/root.$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1).rootfs
-endef
 endif
 
-ifeq ($(CONFIG_TARGET_lantiq_svip_le),y)
-define Image/BuildKernel/Profile/EASY336
-	$(call Image/BuildKernelGzip/Template,EASY33016,$(svip_cmdline))
-endef
-
-define Image/Build/Profile/EASY336
-	$(call Image/Build/$(1),$(1),EASY33016)
-endef
-
-define Image/BuildKernel/Profile/Generic
-	$(call Image/BuildKernelGzip/Template,EASY336,$(svip_cmdline))
-	$(call Image/BuildKernelGzip/Template,NONE)
-endef
-
-define Image/Build/Profile/Generic
-	$(call Image/Build/$(1),$(1),EASY336)
-	$(call Image/Build/$(1),$(1),NONE)
-	$(CP) $(KDIR)/root.$(1) $(BIN_DIR)/$(IMG_PREFIX)-$(1).rootfs
-endef
-endif
 
 define Image/BuildKernel
 	$(call Image/BuildKernel/Profile/$(PROFILE))

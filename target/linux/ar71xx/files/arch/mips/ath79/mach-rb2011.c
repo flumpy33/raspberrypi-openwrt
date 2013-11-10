@@ -12,15 +12,18 @@
 #define pr_fmt(fmt) "rb2011: " fmt
 
 #include <linux/phy.h>
+#include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/ath9k_platform.h>
 #include <linux/ar8216_platform.h>
 #include <linux/mtd/mtd.h>
+#include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
 #include <linux/rle.h>
 #include <linux/routerboot.h>
+#include <linux/gpio.h>
 
 #include <asm/mach-ath79/ath79.h>
 #include <asm/mach-ath79/ar71xx_regs.h>
@@ -28,16 +31,20 @@
 #include "common.h"
 #include "dev-eth.h"
 #include "dev-m25p80.h"
+#include "dev-nfc.h"
+#include "dev-usb.h"
 #include "dev-wmac.h"
 #include "machtypes.h"
 #include "routerboot.h"
 
+#define RB2011_GPIO_NAND_NCE	14
+#define RB2011_GPIO_SFP_LOS	21
+
 #define RB_ROUTERBOOT_OFFSET	0x0000
-#define RB_ROUTERBOOT_SIZE	0xb000
-#define RB_HARD_CFG_OFFSET	0xb000
+#define RB_ROUTERBOOT_MIN_SIZE	0xb000
 #define RB_HARD_CFG_SIZE	0x1000
 #define RB_BIOS_OFFSET		0xd000
-#define RB_BIOS_SIZE		0x2000
+#define RB_BIOS_SIZE		0x1000
 #define RB_SOFT_CFG_OFFSET	0xf000
 #define RB_SOFT_CFG_SIZE	0x1000
 
@@ -47,11 +54,9 @@ static struct mtd_partition rb2011_spi_partitions[] = {
 	{
 		.name		= "routerboot",
 		.offset		= RB_ROUTERBOOT_OFFSET,
-		.size		= RB_ROUTERBOOT_SIZE,
 		.mask_flags	= MTD_WRITEABLE,
 	}, {
 		.name		= "hard_config",
-		.offset		= RB_HARD_CFG_OFFSET,
 		.size		= RB_HARD_CFG_SIZE,
 		.mask_flags	= MTD_WRITEABLE,
 	}, {
@@ -61,9 +66,46 @@ static struct mtd_partition rb2011_spi_partitions[] = {
 		.mask_flags	= MTD_WRITEABLE,
 	}, {
 		.name		= "soft_config",
-		.offset		= RB_SOFT_CFG_OFFSET,
 		.size		= RB_SOFT_CFG_SIZE,
 	}
+};
+
+
+static void __init rb2011_init_partitions(void)
+{
+	u8 *addr = (u8 *) KSEG1ADDR(0x1f000000);
+	u32 next = RB_ROUTERBOOT_MIN_SIZE;
+
+	if (routerboot_find_magic(addr, 0x10000, &next, true))
+		printk(KERN_ERR "Warning: could not find a valid RouterBOOT hard config\n");
+	rb2011_spi_partitions[0].size = next;
+	rb2011_spi_partitions[1].offset = next;
+
+	next = RB_BIOS_OFFSET + RB_BIOS_SIZE;
+	if (routerboot_find_magic(addr, 0x10000, &next, false))
+		printk(KERN_ERR "Warning: could not find a valid RouterBOOT soft config\n");
+
+	rb2011_spi_partitions[3].offset = next;
+}
+
+
+static struct mtd_partition rb2011_nand_partitions[] = {
+	{
+		.name	= "booter",
+		.offset	= 0,
+		.size	= (256 * 1024),
+		.mask_flags = MTD_WRITEABLE,
+	},
+	{
+		.name	= "kernel",
+		.offset	= (256 * 1024),
+		.size	= (4 * 1024 * 1024) - (256 * 1024),
+	},
+	{
+		.name	= "rootfs",
+		.offset	= MTDPART_OFS_NXTBLK,
+		.size	= MTDPART_SIZ_FULL,
+	},
 };
 
 static struct flash_platform_data rb2011_spi_flash_data = {
@@ -75,19 +117,31 @@ static struct ar8327_pad_cfg rb2011_ar8327_pad0_cfg = {
 	.mode = AR8327_PAD_MAC_RGMII,
 	.txclk_delay_en = true,
 	.rxclk_delay_en = true,
-	.txclk_delay_sel = AR8327_CLK_DELAY_SEL1,
-	.rxclk_delay_sel = AR8327_CLK_DELAY_SEL2,
+	.txclk_delay_sel = AR8327_CLK_DELAY_SEL3,
+	.rxclk_delay_sel = AR8327_CLK_DELAY_SEL0,
+};
+
+static struct ar8327_pad_cfg rb2011_ar8327_pad6_cfg;
+static struct ar8327_sgmii_cfg rb2011_ar8327_sgmii_cfg;
+
+static struct ar8327_led_cfg rb2011_ar8327_led_cfg = {
+	.led_ctrl0 = 0x0000c731,
+	.led_ctrl1 = 0x00000000,
+	.led_ctrl2 = 0x00000000,
+	.led_ctrl3 = 0x0030c300,
+	.open_drain = false,
 };
 
 static struct ar8327_platform_data rb2011_ar8327_data = {
 	.pad0_cfg = &rb2011_ar8327_pad0_cfg,
-	.cpuport_cfg = {
+	.port0_cfg = {
 		.force_link = 1,
 		.speed = AR8327_PORT_SPEED_1000,
 		.duplex = 1,
 		.txpause = 1,
 		.rxpause = 1,
-	}
+	},
+	.led_cfg = &rb2011_ar8327_led_cfg,
 };
 
 static struct mdio_board_info rb2011_mdio0_info[] = {
@@ -98,32 +152,16 @@ static struct mdio_board_info rb2011_mdio0_info[] = {
 	},
 };
 
-static void __init rb2011_gmac_setup(void)
-{
-	void __iomem *base;
-	u32 t;
-
-	base = ioremap(AR934X_GMAC_BASE, AR934X_GMAC_SIZE);
-
-	t = __raw_readl(base + AR934X_GMAC_REG_ETH_CFG);
-	t &= ~(AR934X_ETH_CFG_RGMII_GMAC0 | AR934X_ETH_CFG_MII_GMAC0 |
-		AR934X_ETH_CFG_GMII_GMAC0 | AR934X_ETH_CFG_SW_ONLY_MODE);
-	t |= AR934X_ETH_CFG_RGMII_GMAC0 | AR934X_ETH_CFG_SW_ONLY_MODE;
-
-	__raw_writel(t, base + AR934X_GMAC_REG_ETH_CFG);
-
-	iounmap(base);
-}
-
 static void __init rb2011_wlan_init(void)
 {
-	u8 *hard_cfg = (u8 *) KSEG1ADDR(0x1f000000 + RB_HARD_CFG_OFFSET);
+	u8 *hard_cfg = (u8 *) KSEG1ADDR(0x1f000000);
 	u16 tag_len;
 	u8 *tag;
 	char *art_buf;
 	u8 wlan_mac[ETH_ALEN];
 	int err;
 
+	hard_cfg += rb2011_spi_partitions[1].offset;
 	err = routerboot_find_tag(hard_cfg, RB_HARD_CFG_SIZE, RB_ID_WLAN_DATA,
 				  &tag, &tag_len);
 	if (err) {
@@ -151,11 +189,91 @@ free:
 	kfree(art_buf);
 }
 
+static void rb2011_nand_select_chip(int chip_no)
+{
+	switch (chip_no) {
+	case 0:
+		gpio_set_value(RB2011_GPIO_NAND_NCE, 0);
+		break;
+	default:
+		gpio_set_value(RB2011_GPIO_NAND_NCE, 1);
+		break;
+	}
+	ndelay(500);
+}
+
+static struct nand_ecclayout rb2011_nand_ecclayout = {
+	.eccbytes	= 6,
+	.eccpos		= { 8, 9, 10, 13, 14, 15 },
+	.oobavail	= 9,
+	.oobfree	= { { 0, 4 }, { 6, 2 }, { 11, 2 }, { 4, 1 } }
+};
+
+static int rb2011_nand_scan_fixup(struct mtd_info *mtd)
+{
+	struct nand_chip *chip = mtd->priv;
+
+	if (mtd->writesize == 512) {
+		/*
+		 * Use the OLD Yaffs-1 OOB layout, otherwise RouterBoot
+		 * will not be able to find the kernel that we load.
+		 */
+		chip->ecc.layout = &rb2011_nand_ecclayout;
+	}
+
+	return 0;
+}
+
+static void __init rb2011_nand_init(void)
+{
+	gpio_request_one(RB2011_GPIO_NAND_NCE, GPIOF_OUT_INIT_HIGH, "NAND nCE");
+
+	ath79_nfc_set_scan_fixup(rb2011_nand_scan_fixup);
+	ath79_nfc_set_parts(rb2011_nand_partitions,
+			    ARRAY_SIZE(rb2011_nand_partitions));
+	ath79_nfc_set_select_chip(rb2011_nand_select_chip);
+	ath79_nfc_set_swap_dma(true);
+	ath79_register_nfc();
+}
+
+static int rb2011_get_port_link(unsigned port)
+{
+	if (port != 6)
+		return -EINVAL;
+
+	/* The Loss of signal line is active low */
+	return !gpio_get_value(RB2011_GPIO_SFP_LOS);
+}
+
+static void __init rb2011_sfp_init(void)
+{
+	gpio_request_one(RB2011_GPIO_SFP_LOS, GPIOF_IN, "SFP LOS");
+
+	rb2011_ar8327_pad6_cfg.mode = AR8327_PAD_MAC_SGMII;
+
+	rb2011_ar8327_data.pad6_cfg = &rb2011_ar8327_pad6_cfg;
+
+	rb2011_ar8327_sgmii_cfg.sgmii_ctrl = 0xc70167d0;
+	rb2011_ar8327_sgmii_cfg.serdes_aen = true;
+
+	rb2011_ar8327_data.sgmii_cfg = &rb2011_ar8327_sgmii_cfg;
+
+	rb2011_ar8327_data.port6_cfg.force_link = 1;
+	rb2011_ar8327_data.port6_cfg.speed = AR8327_PORT_SPEED_1000;
+	rb2011_ar8327_data.port6_cfg.duplex = 1;
+
+	rb2011_ar8327_data.get_port_link = rb2011_get_port_link;
+}
+
 static void __init rb2011_setup(void)
 {
-	ath79_register_m25p80(&rb2011_spi_flash_data);
+	rb2011_init_partitions();
 
-	rb2011_gmac_setup();
+	ath79_register_m25p80(&rb2011_spi_flash_data);
+	rb2011_nand_init();
+
+	ath79_setup_ar934x_eth_cfg(AR934X_ETH_CFG_RGMII_GMAC0 |
+				   AR934X_ETH_CFG_SW_ONLY_MODE);
 
 	ath79_register_mdio(1, 0x0);
 	ath79_register_mdio(0, 0x0);
@@ -184,10 +302,24 @@ static void __init rb2011_setup(void)
 MIPS_MACHINE(ATH79_MACH_RB_2011L, "2011L", "MikroTik RouterBOARD 2011L",
 	     rb2011_setup);
 
+static void __init rb2011us_setup(void)
+{
+	rb2011_setup();
+	rb2011_sfp_init();
+
+	ath79_register_usb();
+}
+
+MIPS_MACHINE(ATH79_MACH_RB_2011US, "2011US", "MikroTik RouterBOARD 2011UAS",
+	     rb2011us_setup);
+
 static void __init rb2011g_setup(void)
 {
 	rb2011_setup();
+	rb2011_sfp_init();
 	rb2011_wlan_init();
+
+	ath79_register_usb();
 }
 
 MIPS_MACHINE(ATH79_MACH_RB_2011G, "2011G", "MikroTik RouterBOARD 2011UAS-2HnD",
