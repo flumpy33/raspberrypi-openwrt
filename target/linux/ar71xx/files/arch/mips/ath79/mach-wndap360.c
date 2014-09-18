@@ -22,16 +22,13 @@
 #include "dev-gpio-buttons.h"
 #include "dev-leds-gpio.h"
 #include "dev-m25p80.h"
-#include "dev-usb.h"
 #include "machtypes.h"
 
 #define WNDAP360_GPIO_LED_POWER_ORANGE		0
 #define WNDAP360_GPIO_LED_POWER_GREEN		2
 
 /* Reset button - next to the power connector */
-#define WNDAP360_GPIO_BTN_RESET		3
-/* WPS button - next to a led on right */
-#define WNDAP360_GPIO_BTN_WPS		8
+#define WNDAP360_GPIO_BTN_RESET			8
 
 #define WNDAP360_KEYS_POLL_INTERVAL		20	/* msecs */
 #define WNDAP360_KEYS_DEBOUNCE_INTERVAL	(3 * WNDAP360_KEYS_POLL_INTERVAL)
@@ -47,11 +44,11 @@
  */
 static struct gpio_led wndap360_leds_gpio[] __initdata = {
 	{
-		.name		= "wndap360:green:power",
+		.name		= "netgear:green:power",
 		.gpio		= WNDAP360_GPIO_LED_POWER_GREEN,
 		.active_low	= 1,
 	}, {
-		.name		= "wndap360:orange:power",
+		.name		= "netgear:orange:power",
 		.gpio		= WNDAP360_GPIO_LED_POWER_ORANGE,
 		.active_low	= 1,
         }
@@ -76,7 +73,9 @@ static void __init wndap360_setup(void)
 
 	ath79_register_mdio(0, ~(WNDAP360_LAN_PHYMASK));
 
-	ath79_init_mac(ath79_eth0_data.mac_addr, art, 0);
+	/* Reusing wifi MAC with offset of 1 as eth0 MAC */
+	ath79_init_mac(ath79_eth0_data.mac_addr,
+		       art + WNDAP360_WMAC0_MAC_OFFSET, 1);
 	ath79_eth0_pll_data.pll_1000 = 0x11110000;
 	ath79_eth0_data.phy_if_mode = PHY_INTERFACE_MODE_RGMII;
 	ath79_eth0_data.phy_mask = WNDAP360_LAN_PHYMASK;
@@ -84,8 +83,6 @@ static void __init wndap360_setup(void)
 	ath79_eth0_data.duplex = DUPLEX_FULL;
 
 	ath79_register_eth(0);
-
-	ath79_register_usb();
 
 	ath79_register_m25p80(NULL);
 
@@ -95,6 +92,9 @@ static void __init wndap360_setup(void)
 	ath79_register_gpio_keys_polled(-1, WNDAP360_KEYS_POLL_INTERVAL,
 					 ARRAY_SIZE(wndap360_gpio_keys),
 					 wndap360_gpio_keys);
+
+	ap9x_pci_setup_wmac_led_pin(0, 5);
+	ap9x_pci_setup_wmac_led_pin(1, 5);
 
 	ap94_pci_init(art + WNDAP360_CALDATA0_OFFSET,
 		      art + WNDAP360_WMAC0_MAC_OFFSET,

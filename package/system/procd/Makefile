@@ -1,13 +1,21 @@
+#
+# Copyright (C) 2014 OpenWrt.org
+#
+# This is free software, licensed under the GNU General Public License v2.
+# See /LICENSE for more information.
+#
+
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=procd
-PKG_VERSION:=2013-06-27
+PKG_VERSION:=2014-09-09
+
 PKG_RELEASE=$(PKG_SOURCE_VERSION)
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=git://nbd.name/luci2/procd.git
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_VERSION:=0d44f0de9eacf687182ebebfcb1f9496dbf3bc32
+PKG_SOURCE_VERSION:=4bd633868e3284659668f14aa39ea84aaadc2dec
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 CMAKE_INSTALL:=1
 
@@ -24,17 +32,32 @@ TARGET_LDFLAGS += $(if $(CONFIG_USE_EGLIBC),-lrt)
 define Package/procd
   SECTION:=base
   CATEGORY:=Base system
-  DEPENDS:=+ubusd +ubus +libjson-script +ubox +USE_EGLIBC:librt
+  DEPENDS:=+ubusd +ubus +libjson-script +ubox +USE_EGLIBC:librt +libubox +libubus +NAND_SUPPORT:procd-nand
   TITLE:=OpenWrt system process manager
 endef
 
-define Package/procd/install
-	$(INSTALL_DIR) $(1)/sbin $(1)/lib/functions $(1)/etc
+define Package/procd-nand
+  SECTION:=utils
+  CATEGORY:=Utilities
+  DEPENDS:=@NAND_SUPPORT +ubi-utils
+  TITLE:=OpenWrt sysupgrade nand helper
+endef
 
-	$(CP) $(PKG_INSTALL_DIR)/usr/sbin/{procd,askfirst,udevtrigger,logread} $(1)/sbin/
+define Package/procd/install
+	$(INSTALL_DIR) $(1)/sbin $(1)/etc $(1)/lib/functions
+
+	$(CP) $(PKG_INSTALL_DIR)/usr/sbin/{init,procd,askfirst,udevtrigger} $(1)/sbin/
+	$(INSTALL_BIN) ./files/reload_config $(1)/sbin/
 	$(INSTALL_DATA) ./files/hotplug*.json $(1)/etc/
 	$(INSTALL_DATA) ./files/procd.sh $(1)/lib/functions/
-	ln -s /sbin/procd $(1)/sbin/init
+endef
+
+define Package/procd-nand/install
+	$(INSTALL_DIR) $(1)/sbin $(1)/lib/upgrade
+
+	$(CP) $(PKG_INSTALL_DIR)/usr/sbin/upgraded $(1)/sbin/
+	$(INSTALL_DATA) ./files/nand.sh $(1)/lib/upgrade/
 endef
 
 $(eval $(call BuildPackage,procd))
+$(eval $(call BuildPackage,procd-nand))

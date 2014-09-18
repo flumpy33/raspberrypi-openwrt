@@ -31,8 +31,8 @@ board=$board_name
 case "$FIRMWARE" in
 "rt2x00.eeprom" )
 	case $board in
-	HW556_A)
-		rt2x00_eeprom_extract "cal_data" 130560 272
+	HW556_C)
+		rt2x00_eeprom_extract "cal_data" 130560 512
 		;;
 	*)
 		rt2x00_eeprom_die "board $board is not supported yet"

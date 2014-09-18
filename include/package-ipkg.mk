@@ -1,9 +1,11 @@
 #
-# Copyright (C) 2006,2007 OpenWrt.org
+# Copyright (C) 2006-2014 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
 #
+
+include $(INCLUDE_DIR)/feeds.mk
 
 # invoke ipkg-build with some default options
 IPKG_BUILD:= \
@@ -14,7 +16,7 @@ IPKG_STATE_DIR:=$(TARGET_DIR)/usr/lib/opkg
 define BuildIPKGVariable
 ifdef Package/$(1)/$(2)
   $(call shexport,Package/$(1)/$(2))
-  $(1)_COMMANDS += var2file "$(call shvar,Package/$(1)/$(2))" $(2);
+  $(1)_COMMANDS += var2file "$(call shvar,Package/$(1)/$(2))" $(2)$(3);
 endif
 endef
 
@@ -54,15 +56,18 @@ ifneq ($(PKG_NAME),toolchain)
 	@( \
 		rm -f $(PKG_INFO_DIR)/$(1).missing; \
 		( \
-			export READELF=$(TARGET_CROSS)readelf XARGS="$(XARGS)"; \
+			export \
+				READELF=$(TARGET_CROSS)readelf \
+				OBJCOPY=$(TARGET_CROSS)objcopy \
+				XARGS="$(XARGS)"; \
 			$(SCRIPT_DIR)/gen-dependencies.sh "$$(IDIR_$(1))"; \
 		) | while read FILE; do \
 			grep -q "$$$$FILE" $(PKG_INFO_DIR)/$(1).provides || \
 				echo "$$$$FILE" >> $(PKG_INFO_DIR)/$(1).missing; \
 		done; \
 		if [ -f "$(PKG_INFO_DIR)/$(1).missing" ]; then \
-			echo "Package $(1) is missing dependencies for the following libraries:"; \
-			cat "$(PKG_INFO_DIR)/$(1).missing"; \
+			echo "Package $(1) is missing dependencies for the following libraries:" >&2; \
+			cat "$(PKG_INFO_DIR)/$(1).missing" >&2; \
 			false; \
 		fi; \
 	)
@@ -71,15 +76,19 @@ endif
 
 ifeq ($(DUMP),)
   define BuildTarget/ipkg
-    IPKG_$(1):=$(PACKAGE_DIR)/$(1)_$(VERSION)_$(PKGARCH).ipk
+    PDIR_$(1):=$(call FeedPackageDir,$(1))
+    IPKG_$(1):=$$(PDIR_$(1))/$(1)_$(VERSION)_$(PKGARCH).ipk
     IDIR_$(1):=$(PKG_BUILD_DIR)/ipkg-$(PKGARCH)/$(1)
     KEEP_$(1):=$(strip $(call Package/$(1)/conffiles))
 
     ifeq ($(BUILD_VARIANT),$$(if $$(VARIANT),$$(VARIANT),$(BUILD_VARIANT)))
     ifdef Package/$(1)/install
-      ifneq ($(CONFIG_PACKAGE_$(1))$(SDK)$(DEVELOPER),)
+      ifneq ($(CONFIG_PACKAGE_$(1))$(DEVELOPER),)
         IPKGS += $(1)
         compile: $$(IPKG_$(1)) $(PKG_INFO_DIR)/$(1).provides $(STAGING_DIR_ROOT)/stamp/.$(1)_installed
+        ifneq ($(ABI_VERSION),)
+        compile: $(PKG_INFO_DIR)/$(1).version
+        endif
 
         ifeq ($(CONFIG_PACKAGE_$(1)),y)
           .PHONY: $(PKG_INSTALL_STAMP).$(1)
@@ -108,8 +117,8 @@ ifeq ($(DUMP),)
 
     $(eval $(call BuildIPKGVariable,$(1),conffiles))
     $(eval $(call BuildIPKGVariable,$(1),preinst))
-    $(eval $(call BuildIPKGVariable,$(1),postinst))
-    $(eval $(call BuildIPKGVariable,$(1),prerm))
+    $(eval $(call BuildIPKGVariable,$(1),postinst,-pkg))
+    $(eval $(call BuildIPKGVariable,$(1),prerm,-pkg))
     $(eval $(call BuildIPKGVariable,$(1),postrm))
 
     $(STAGING_DIR_ROOT)/stamp/.$(1)_installed: $(STAMP_BUILT)
@@ -121,19 +130,23 @@ ifeq ($(DUMP),)
 	rm -rf $(STAGING_DIR_ROOT)/tmp-$(1)
 	touch $$@
 
+    $(PKG_INFO_DIR)/$(1).version: $$(IPKG_$(1))
+	echo '$(ABI_VERSION)' | cmp -s - $$@ || \
+		echo '$(ABI_VERSION)' > $$@
+
     $(PKG_INFO_DIR)/$(1).provides: $$(IPKG_$(1))
     $$(IPKG_$(1)): $(STAMP_BUILT) $(INCLUDE_DIR)/package-ipkg.mk
-	@rm -rf $(PACKAGE_DIR)/$(1)_* $$(IDIR_$(1))
+	@rm -rf $$(PDIR_$(1))/$(1)_* $$(IDIR_$(1))
 	mkdir -p $(PACKAGE_DIR) $$(IDIR_$(1))/CONTROL $(PKG_INFO_DIR)
 	$(call Package/$(1)/install,$$(IDIR_$(1)))
 	-find $$(IDIR_$(1)) -name 'CVS' -o -name '.svn' -o -name '.#*' -o -name '*~'| $(XARGS) rm -rf
 	@( \
-		find $$(IDIR_$(1)) -name lib\*.so\* | awk -F/ '{ print $$$$NF }'; \
+		find $$(IDIR_$(1)) -name lib\*.so\* -or -name \*.ko | awk -F/ '{ print $$$$NF }'; \
 		for file in $$(patsubst %,$(PKG_INFO_DIR)/%.provides,$$(IDEPEND_$(1))); do \
 			if [ -f "$$$$file" ]; then \
 				cat $$$$file; \
 			fi; \
-		done; \
+		done; $(Package/$(1)/extra_provides) \
 	) | sort -u > $(PKG_INFO_DIR)/$(1).provides
 	$(if $(PROVIDES),@for pkg in $(PROVIDES); do cp $(PKG_INFO_DIR)/$(1).provides $(PKG_INFO_DIR)/$$$$pkg.provides; done)
 	$(CheckDependencies)
@@ -149,11 +162,10 @@ ifeq ($(DUMP),)
 		[ -z "$$$$DEPENDS" ] || echo "Depends: $$$$DEPENDS"; \
 		$(if $(PROVIDES), echo "Provides: $(PROVIDES)"; ) \
 		echo "Source: $(SOURCE)"; \
-		$(if $(PKG_SOURCE), echo "SourceFile: $(PKG_SOURCE)"; ) \
-		$(if $(PKG_SOURCE_URL), echo "SourceURL: $(PKG_SOURCE_URL)"; ) \
 		$(if $(PKG_LICENSE), echo "License: $(PKG_LICENSE)"; ) \
 		$(if $(PKG_LICENSE_FILES), echo "LicenseFiles: $(PKG_LICENSE_FILES)"; ) \
 		echo "Section: $(SECTION)"; \
+		$(if $(USERID),echo "Require-User: $(USERID)"; ) \
 		$(if $(filter hold,$(PKG_FLAGS)),echo "Status: unknown hold not-installed"; ) \
 		$(if $(filter essential,$(PKG_FLAGS)), echo "Essential: yes"; ) \
 		$(if $(MAINTAINER),echo "Maintainer: $(MAINTAINER)"; ) \
@@ -162,6 +174,17 @@ ifeq ($(DUMP),)
 		echo -n "Description: "; $(SH_FUNC) getvar $(call shvar,Package/$(1)/description) | sed -e 's,^[[:space:]]*, ,g'; \
  	) > $$(IDIR_$(1))/CONTROL/control
 	chmod 644 $$(IDIR_$(1))/CONTROL/control
+	( \
+		echo "#!/bin/sh"; \
+		echo ". \$$$${IPKG_INSTROOT}/lib/functions.sh"; \
+		echo "default_postinst \$$$$0 \$$$$@"; \
+	) > $$(IDIR_$(1))/CONTROL/postinst
+	( \
+		echo "#!/bin/sh"; \
+		echo ". \$$$${IPKG_INSTROOT}/lib/functions.sh"; \
+		echo "default_prerm \$$$$0 \$$$$@"; \
+	) > $$(IDIR_$(1))/CONTROL/prerm
+	chmod 0755 $$(IDIR_$(1))/CONTROL/prerm
 	$(SH_FUNC) (cd $$(IDIR_$(1))/CONTROL; \
 		$($(1)_COMMANDS) \
 	)
@@ -179,11 +202,12 @@ ifeq ($(DUMP),)
 		)
     endif
 
-	$(IPKG_BUILD) $$(IDIR_$(1)) $(PACKAGE_DIR)
+	$(INSTALL_DIR) $$(PDIR_$(1))
+	$(IPKG_BUILD) $$(IDIR_$(1)) $$(PDIR_$(1))
 	@[ -f $$(IPKG_$(1)) ]
 
     $(1)-clean:
-	rm -f $(PACKAGE_DIR)/$(1)_*
+	rm -f $$(PDIR_$(1))/$(1)_*
 
     clean: $(1)-clean
 

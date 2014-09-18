@@ -16,13 +16,15 @@ include $(INCLUDE_DIR)/package.mk
 define KernelPackage/button-hotplug
   SUBMENU:=Other modules
   TITLE:=Button Hotplug driver
+  DEPENDS:=+kmod-input-core
   FILES:=$(PKG_BUILD_DIR)/button-hotplug.ko
   AUTOLOAD:=$(call AutoLoad,30,button-hotplug,1)
   KCONFIG:=
 endef
 
 define KernelPackage/button-hotplug/description
-  Kernel module to generate button hotplug events
+  Kernel module to generate button uevent-s from input subsystem events.
+  If your device uses GPIO buttons, see gpio-button-hotplug.
 endef
 
 EXTRA_KCONFIG:= \

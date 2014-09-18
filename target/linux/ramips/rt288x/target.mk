@@ -4,7 +4,9 @@
 
 SUBTARGET:=rt288x
 BOARDNAME:=RT288x based boards
-CFLAGS+= -mips32r2 -mtune=mips32r2
+CPU_TYPE:=mips32r2
+
+DEFAULT_PACKAGES += kmod-rt2800-soc
 
 define Target/Description
 	Build firmware images for Ralink RT288x based boards.

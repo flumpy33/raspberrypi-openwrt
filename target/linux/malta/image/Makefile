@@ -21,15 +21,12 @@ endef
 
 define MkuImage
 	mkimage -A mips -O linux -T kernel -a 0x80100000 -C $(1) $(2) \
-		-e $(call get_kernel_entry,$(LINUX_DIR)/vmlinux) -n 'MIPS OpenWrt Linux-$(LINUX_VERSION)' \
+		-e $(call get_kernel_entry,$(KDIR)/vmlinux.debug) -n 'MIPS OpenWrt Linux-$(LINUX_VERSION)' \
 		-d $(3) $(4)
 endef
 
 define Image/BuildKernel
 	cp $(KDIR)/vmlinux.elf $(BIN_DIR)/$(IMG_PREFIX)-vmlinux.elf
-ifneq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),)
-	cp $(KDIR)/vmlinux-initramfs.elf $(BIN_DIR)/$(IMG_PREFIX)-vmlinux-initramfs.elf
-endif
 	$(call CompressLzma,$(KDIR)/vmlinux,$(KDIR)/vmlinux.bin.lzma)
 	$(call MkuImage,lzma,,$(KDIR)/vmlinux.bin.lzma,$(BIN_DIR)/$(IMG_PREFIX)-uImage-lzma)
 	$(call CompressGzip,$(KDIR)/vmlinux,$(KDIR)/vmlinux.bin.gz)

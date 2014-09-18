@@ -32,6 +32,7 @@ define Package/Default
   else
     VERSION:=$(PKG_RELEASE)
   endif
+  ABI_VERSION:=
   ifneq ($(PKG_FLAGS),)
     PKGFLAGS:=$(PKG_FLAGS)
   else
@@ -52,6 +53,7 @@ define Package/Default
   HIDDEN:=
   URL:=
   VARIANT:=
+  USERID:=
 endef
 
 Build/Patch:=$(Build/Patch/Default)
@@ -63,6 +65,7 @@ ifneq ($(strip $(PKG_UNPACK)),)
 endif
 
 EXTRA_CXXFLAGS = $(EXTRA_CFLAGS)
+DISABLE_NLS:=--disable-nls
 
 CONFIGURE_PREFIX:=/usr
 CONFIGURE_ARGS = \

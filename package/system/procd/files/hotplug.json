@@ -13,7 +13,7 @@
 								[ "null", "full", "ptmx", "zero" ],
 							],
 							[ "regex", "DEVNAME",
-								[ "^gpio", "^hvc", "^tty" ],
+								[ "^gpio", "^hvc" ],
 							],
 						],
 						[
@@ -70,8 +70,17 @@
 	],
 	[ "if",
 		[ "eq", "SUBSYSTEM",
-			[ "net", "input", "usb", "ieee1394", "block", "atm", "zaptel", "tty" ]
+			[ "net", "input", "usb", "ieee1394", "block", "atm", "zaptel", "tty", "button" ]
 		],
 		[ "exec", "/sbin/hotplug-call", "%SUBSYSTEM%" ]
+	],
+	[ "if",
+		[ "and",
+			[ "eq", "SUBSYSTEM", "usb-serial" ],
+			[ "regex", "DEVNAME",
+				[ "^ttyUSB", "^ttyACM" ]
+			],
+		],
+		[ "exec", "/sbin/hotplug-call", "tty" ]
 	],
 ]

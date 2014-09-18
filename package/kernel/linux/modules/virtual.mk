@@ -7,7 +7,6 @@
 
 VIRTUAL_MENU:=Virtualization Support
 
-
 define KernelPackage/virtio-balloon
   SUBMENU:=$(VIRTUAL_MENU)
   TITLE:=VirtIO balloon driver
@@ -18,7 +17,7 @@ define KernelPackage/virtio-balloon
 endef
 
 define KernelPackage/virtio-balloon/description
-  Kernel module for VirtIO memory ballooning support
+ Kernel module for VirtIO memory ballooning support
 endef
 
 $(eval $(call KernelPackage,virtio-balloon))
@@ -50,15 +49,32 @@ define KernelPackage/virtio-random
 endef
 
 define KernelPackage/virtio-random/description
-  Kernel module for the VirtIO Random Number Generator
+ Kernel module for the VirtIO Random Number Generator
 endef
 
 $(eval $(call KernelPackage,virtio-random))
 
+
+define KernelPackage/xen-privcmd
+  SUBMENU:=$(VIRTUAL_MENU)
+  TITLE:=Xen private commands
+  DEPENDS:=@TARGET_x86_xen_domu
+  KCONFIG:=CONFIG_XEN_PRIVCMD
+  FILES:=$(LINUX_DIR)/drivers/xen/xen-privcmd.ko
+  AUTOLOAD:=$(call AutoLoad,04,xen-privcmd)
+endef
+
+define KernelPackage/xen-privcmd/description
+ Kernel module for Xen private commands
+endef
+
+$(eval $(call KernelPackage,xen-privcmd))
+
+
 define KernelPackage/xen-fs
   SUBMENU:=$(VIRTUAL_MENU)
   TITLE:=Xen filesystem
-  DEPENDS:=@TARGET_x86_xen_domu
+  DEPENDS:=@TARGET_x86_xen_domu +kmod-xen-privcmd
   KCONFIG:= \
   	CONFIG_XENFS \
   	CONFIG_XEN_COMPAT_XENFS=y
@@ -67,7 +83,7 @@ define KernelPackage/xen-fs
 endef
 
 define KernelPackage/xen-fs/description
-  Kernel module for the Xen filesystem
+ Kernel module for the Xen filesystem
 endef
 
 $(eval $(call KernelPackage,xen-fs))
@@ -83,7 +99,7 @@ define KernelPackage/xen-evtchn
 endef
 
 define KernelPackage/xen-evtchn/description
-  Kernel module for the /dev/xen/evtchn device
+ Kernel module for the /dev/xen/evtchn device
 endef
 
 $(eval $(call KernelPackage,xen-evtchn))
@@ -117,7 +133,7 @@ define KernelPackage/xen-fbdev
 endef
 
 define KernelPackage/xen-fbdev/description
-  Kernel module for the Xen virtual frame buffer
+ Kernel module for the Xen virtual frame buffer
 endef
 
 $(eval $(call KernelPackage,xen-fbdev))
@@ -126,14 +142,15 @@ $(eval $(call KernelPackage,xen-fbdev))
 define KernelPackage/xen-kbddev
   SUBMENU:=$(VIRTUAL_MENU)
   TITLE:=Xen virtual keyboard and mouse
-  DEPENDS:=@TARGET_x86_xen_domu
-  KCONFIG:=CONFIG_XEN_KBDDEV_FRONTEND
-  FILES:=$(LINUX_DIR)/drivers/input/xen-kbdfront.ko
+  DEPENDS:=@TARGET_x86_xen_domu +kmod-input-core
+  KCONFIG:=CONFIG_INPUT_MISC=y \
+	CONFIG_INPUT_XEN_KBDDEV_FRONTEND
+  FILES:=$(LINUX_DIR)/drivers/input/misc/xen-kbdfront.ko
   AUTOLOAD:=$(call AutoLoad,08,xen-kbdfront)
 endef
 
 define KernelPackage/xen-kbddev/description
-  Kernel module for the Xen virtual keyboard and mouse
+ Kernel module for the Xen virtual keyboard and mouse
 endef
 
 $(eval $(call KernelPackage,xen-kbddev))
@@ -149,7 +166,7 @@ define KernelPackage/xen-netdev
 endef
 
 define KernelPackage/xen-netdev/description
-  Kernel module for the Xen network device frontend
+ Kernel module for the Xen network device frontend
 endef
 
 $(eval $(call KernelPackage,xen-netdev))
@@ -165,7 +182,7 @@ define KernelPackage/xen-pcidev
 endef
 
 define KernelPackage/xen-pcidev/description
-  Kernel module for the Xen network device frontend
+ Kernel module for the Xen network device frontend
 endef
 
 $(eval $(call KernelPackage,xen-pcidev))

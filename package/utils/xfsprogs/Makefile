@@ -16,6 +16,7 @@ PKG_MD5SUM:=049cf9873794ea49d0bb3f12d45748a4
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_INSTALL:=1
 PKG_FIXUP:=autoreconf
+PKG_CHECK_FORMAT_SECURITY:=0
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/nls.mk
@@ -23,6 +24,7 @@ include $(INCLUDE_DIR)/nls.mk
 define Package/xfsprogs/default
   SECTION:=utils
   CATEGORY:=Utilities
+  SUBMENU:=Filesystem
   DEPENDS:=+libuuid +libpthread +librt
   URL:=http://oss.sgi.com/projects/xfs
 endef
@@ -44,7 +46,8 @@ endef
 
 CONFIGURE_ARGS += \
 	--enable-gettext=no \
-	--enable-lib64=no
+	--enable-lib64=no \
+	--enable-blkid=no
 
 TARGET_CFLAGS += \
 	-I$(STAGING_DIR)/usr/include \

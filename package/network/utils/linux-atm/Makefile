@@ -18,6 +18,7 @@ PKG_MD5SUM:=d49499368c3cf15f73a05d9bce8824a8
 
 PKG_INSTALL:=1
 PKG_BUILD_PARALLEL:=1
+PKG_CHECK_FORMAT_SECURITY:=0
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -41,7 +42,7 @@ endef
 define Package/linux-atm/Default
   SECTION:=net
   CATEGORY:=Network
-  DEPENDS:=linux-atm
+  DEPENDS:=+linux-atm
   URL:=http://linux-atm.sourceforge.net/
   SUBMENU:=Linux ATM tools
 endef

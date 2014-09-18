@@ -5,6 +5,17 @@
 # See /LICENSE for more information.
 #
 
+define Profile/DIR505A1
+	NAME:=D-Link DIR-505 rev. A1
+	PACKAGES:=kmod-usb-core kmod-usb2 kmod-ledtrig-usbdev
+endef
+
+define Profile/DIR505A1/Description
+	Package set optimized for the D-Link DIR-505 rev. A1.
+endef
+
+$(eval $(call Profile,DIR505A1))
+
 define Profile/DIR600A1
 	NAME:=D-Link DIR-600 rev. A1
 	PACKAGES:=
@@ -49,6 +60,16 @@ endef
 
 $(eval $(call Profile,DIR615C1))
 
+define Profile/DIR615E1
+	NAME:=D-Link DIR-615 rev. E1
+	PACKAGES:=
+endef
+
+define Profile/DIR615E1/Description
+	Package set optimized for the D-Link DIR-615 rev. E1.
+endef
+
+$(eval $(call Profile,DIR615E1))
 
 define Profile/DIR615E4
 	NAME:=D-Link DIR-615 rev. E4

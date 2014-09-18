@@ -10,17 +10,13 @@
 		bootargs = "console=ttyS0,115200";
 	};
 
-	palmbus@10000000 {
-		sysc@0 {
-			ralink,pinmux = "i2c", "spi", "uartlite", "jtag", "mdio", "sdram", "rgmii";
-			ralink,uartmux = "gpio";
-			ralink,wdtmux = <1>;
+	pinctrl {
+		state_default: pinctrl0 {
+			gpio {
+				ralink,group = "spi", "i2c", "jtag", "rgmii", "mdio", "uartf";
+				ralink,function = "gpio";
+			};
 		};
-
-		gpio0: gpio@600 {
-			status = "okay";
-		};
-
 	};
 
 	gpio-leds {
@@ -86,16 +82,15 @@
 	};
 
 	ethernet@10100000 {
-		status = "okay";
+		mtd-mac-address = <&factory 0x28>;
 	};
 
 	esw@10110000 {
-		status = "okay";
 		ralink,portmap = <0x3e>;
 	};
 
 	wmac@10180000 {
-		status = "okay";
+		ralink,mtd-eeprom = <&factory 0>;
 	};
 
 	otg@101c0000 {

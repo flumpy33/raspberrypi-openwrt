@@ -21,6 +21,7 @@
  * The code is based on the linux-mtd examples.
  */
 
+#define _GNU_SOURCE
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -44,9 +45,7 @@
 #include "fis.h"
 #include "mtd.h"
 
-#ifndef MTDREFRESH
-#define MTDREFRESH	_IO('M', 50)
-#endif
+#include <libubox/md5.h>
 
 #define MAX_ARGS 8
 #define JFFS2_DEFAULT_DIR	"" /* directory name without /, empty means root dir */
@@ -59,6 +58,8 @@ int quiet;
 int no_erase;
 int mtdsize = 0;
 int erasesize = 0;
+int jffs2_skip_bytes=0;
+int mtdtype = 0;
 
 int mtd_open(const char *mtd, bool block)
 {
@@ -67,10 +68,12 @@ int mtd_open(const char *mtd, bool block)
 	int i;
 	int ret;
 	int flags = O_RDWR | O_SYNC;
+	char name[PATH_MAX];
 
+	snprintf(name, sizeof(name), "\"%s\"", mtd);
 	if ((fp = fopen("/proc/mtd", "r"))) {
 		while (fgets(dev, sizeof(dev), fp)) {
-			if (sscanf(dev, "mtd%d:", &i) && strstr(dev, mtd)) {
+			if (sscanf(dev, "mtd%d:", &i) && strstr(dev, name)) {
 				snprintf(dev, sizeof(dev), "/dev/mtd%s/%d", (block ? "block" : ""), i);
 				if ((ret=open(dev, flags))<0) {
 					snprintf(dev, sizeof(dev), "/dev/mtd%s%d", (block ? "block" : ""), i);
@@ -104,8 +107,26 @@ int mtd_check_open(const char *mtd)
 	}
 	mtdsize = mtdInfo.size;
 	erasesize = mtdInfo.erasesize;
+	mtdtype = mtdInfo.type;
 
 	return fd;
+}
+
+int mtd_block_is_bad(int fd, int offset)
+{
+	int r = 0;
+	loff_t o = offset;
+
+	if (mtdtype == MTD_NANDFLASH)
+	{
+		r = ioctl(fd, MEMGETBADBLOCK, &o);
+		if (r < 0)
+		{
+			fprintf(stderr, "Failed to get erase block status\n");
+			exit(1);
+		}
+	}
+	return r;
 }
 
 int mtd_erase_block(int fd, int offset)
@@ -237,10 +258,14 @@ mtd_erase(const char *mtd)
 	for (mtdEraseInfo.start = 0;
 		 mtdEraseInfo.start < mtdsize;
 		 mtdEraseInfo.start += erasesize) {
-
-		ioctl(fd, MEMUNLOCK, &mtdEraseInfo);
-		if(ioctl(fd, MEMERASE, &mtdEraseInfo))
-			fprintf(stderr, "Failed to erase block on %s at 0x%x\n", mtd, mtdEraseInfo.start);
+		if (mtd_block_is_bad(fd, mtdEraseInfo.start)) {
+			if (!quiet)
+				fprintf(stderr, "\nSkipping bad block at 0x%x   ", mtdEraseInfo.start);
+		} else {
+			ioctl(fd, MEMUNLOCK, &mtdEraseInfo);
+			if(ioctl(fd, MEMERASE, &mtdEraseInfo))
+				fprintf(stderr, "Failed to erase block on %s at 0x%x\n", mtd, mtdEraseInfo.start);
+		}
 	}
 
 	close(fd);
@@ -249,30 +274,60 @@ mtd_erase(const char *mtd)
 }
 
 static int
-mtd_refresh(const char *mtd)
+mtd_verify(const char *mtd, char *file)
 {
+	uint32_t f_md5[4], m_md5[4];
+	struct stat s;
+	md5_ctx_t ctx;
+	int ret = 0;
 	int fd;
 
 	if (quiet < 2)
-		fprintf(stderr, "Refreshing mtd partition %s ... ", mtd);
+		fprintf(stderr, "Verifying %s against %s ...\n", mtd, file);
+
+	if (stat(file, &s) || md5sum(file, f_md5)) {
+		fprintf(stderr, "Failed to hash %s\n", file);
+		return -1;
+	}
 
 	fd = mtd_check_open(mtd);
 	if(fd < 0) {
 		fprintf(stderr, "Could not open mtd device: %s\n", mtd);
-		exit(1);
+		return -1;
 	}
 
-	if (ioctl(fd, MTDREFRESH, NULL)) {
-		fprintf(stderr, "Failed to refresh the MTD device\n");
-		close(fd);
-		exit(1);
-	}
+	md5_begin(&ctx);
+	do {
+		char buf[256];
+		int len = (s.st_size > sizeof(buf)) ? (sizeof(buf)) : (s.st_size);
+		int rlen = read(fd, buf, len);
+
+		if (rlen < 0) {
+			if (errno == EINTR)
+				continue;
+			ret = -1;
+			goto out;
+		}
+		if (!rlen)
+			break;
+		md5_hash(buf, rlen, &ctx);
+		s.st_size -= rlen;
+	} while (s.st_size > 0);
+
+	md5_end(m_md5, &ctx);
+
+	fprintf(stderr, "%08x%08x%08x%08x - %s\n", m_md5[0], m_md5[1], m_md5[2], m_md5[3], mtd);
+	fprintf(stderr, "%08x%08x%08x%08x - %s\n", f_md5[0], f_md5[1], f_md5[2], f_md5[3], file);
+
+	ret = memcmp(f_md5, m_md5, sizeof(m_md5));
+	if (!ret)
+		fprintf(stderr, "Success\n");
+	else
+		fprintf(stderr, "Failed\n");
+
+out:
 	close(fd);
-
-	if (quiet < 2)
-		fprintf(stderr, "\n");
-
-	return 0;
+	return ret;
 }
 
 static void
@@ -295,6 +350,7 @@ mtd_write(int imagefd, const char *mtd, char *fis_layout, size_t part_offset)
 	ssize_t skip = 0;
 	uint32_t offset = 0;
 	int jffs2_replaced = 0;
+	int skip_bad_blocks = 0;
 
 #ifdef FIS_SUPPORT
 	static struct fis_part new_parts[MAX_ARGS];
@@ -370,9 +426,8 @@ resume:
 		fprintf(stderr, "Could not open mtd device: %s\n", mtd);
 		exit(1);
 	}
-
 	if (part_offset > 0) {
-		fprintf(stderr, "Seeking on mtd device '%s' to: %u\n", mtd, part_offset);
+		fprintf(stderr, "Seeking on mtd device '%s' to: %zu\n", mtd, part_offset);
 		lseek(fd, part_offset, SEEK_SET);
 	}
 
@@ -401,6 +456,12 @@ resume:
 		if (buflen == 0)
 			break;
 
+		if (buflen < erasesize) {
+			/* Pad block to eraseblock size */
+			memset(&buf[buflen], 0xff, erasesize - buflen);
+			buflen = erasesize;
+		}
+
 		if (skip > 0) {
 			skip -= buflen;
 			buflen = 0;
@@ -410,7 +471,7 @@ resume:
 			continue;
 		}
 
-		if (jffs2file) {
+		if (jffs2file && w >= jffs2_skip_bytes) {
 			if (memcmp(buf, JFFS2_EOF, sizeof(JFFS2_EOF) - 1) == 0) {
 				if (!quiet)
 					fprintf(stderr, "\b\b\b   ");
@@ -438,10 +499,21 @@ resume:
 		/* need to erase the next block before writing data to it */
 		if(!no_erase)
 		{
-			while (w + buflen > e) {
+			while (w + buflen > e - skip_bad_blocks) {
 				if (!quiet)
 					fprintf(stderr, "\b\b\b[e]");
 
+				if (mtd_block_is_bad(fd, e)) {
+					if (!quiet)
+						fprintf(stderr, "\nSkipping bad block at 0x%08x   ", e);
+
+					skip_bad_blocks += erasesize;
+					e += erasesize;
+
+					// Move the file pointer along over the bad block.
+					lseek(fd, erasesize, SEEK_CUR);
+					continue;
+				}
 
 				if (mtd_erase_block(fd, e) < 0) {
 					if (next) {
@@ -514,6 +586,7 @@ static void usage(void)
 	"        unlock                  unlock the device\n"
 	"        refresh                 refresh mtd partition\n"
 	"        erase                   erase all data on device\n"
+	"        verify <imagefile>|-    verify <imagefile> (use - for stdin) to device\n"
 	"        write <imagefile>|-     write <imagefile> (use - for stdin) to device\n"
 	"        jffs2write <file>       append <file> to the jffs2 partition on the device\n");
 	if (mtd_fixtrx) {
@@ -534,6 +607,7 @@ static void usage(void)
 	"        -e <device>             erase <device> before executing the command\n"
 	"        -d <name>               directory for jffs2write, defaults to \"tmp\"\n"
 	"        -j <name>               integrate <file> into jffs2 data when writing an image\n"
+	"        -s <number>             skip the first n bytes when appending data to the jffs2 partiton, defaults to \"0\"\n"
 	"        -p                      write beginning at partition offset\n");
 	if (mtd_fixtrx) {
 	    fprintf(stderr,
@@ -575,10 +649,10 @@ int main (int argc, char **argv)
 		CMD_ERASE,
 		CMD_WRITE,
 		CMD_UNLOCK,
-		CMD_REFRESH,
 		CMD_JFFS2WRITE,
 		CMD_FIXTRX,
 		CMD_FIXSEAMA,
+		CMD_VERIFY,
 	} cmd = -1;
 
 	erase[0] = NULL;
@@ -592,7 +666,7 @@ int main (int argc, char **argv)
 #ifdef FIS_SUPPORT
 			"F:"
 #endif
-			"frnqe:d:j:p:o:")) != -1)
+			"frnqe:d:s:j:p:o:")) != -1)
 		switch (ch) {
 			case 'f':
 				force = 1;
@@ -605,6 +679,14 @@ int main (int argc, char **argv)
 				break;
 			case 'j':
 				jffs2file = optarg;
+				break;
+			case 's':
+				errno = 0;
+				jffs2_skip_bytes = strtoul(optarg, 0, 0);
+				if (errno) {
+						fprintf(stderr, "-s: illegal numeric string\n");
+						usage();
+				}
 				break;
 			case 'q':
 				quiet++;
@@ -658,9 +740,6 @@ int main (int argc, char **argv)
 	if ((strcmp(argv[0], "unlock") == 0) && (argc == 2)) {
 		cmd = CMD_UNLOCK;
 		device = argv[1];
-	} else if ((strcmp(argv[0], "refresh") == 0) && (argc == 2)) {
-		cmd = CMD_REFRESH;
-		device = argv[1];
 	} else if ((strcmp(argv[0], "erase") == 0) && (argc == 2)) {
 		cmd = CMD_ERASE;
 		device = argv[1];
@@ -670,6 +749,10 @@ int main (int argc, char **argv)
 	} else if (((strcmp(argv[0], "fixseama") == 0) && (argc == 2)) && mtd_fixseama) {
 		cmd = CMD_FIXSEAMA;
 		device = argv[1];
+	} else if ((strcmp(argv[0], "verify") == 0) && (argc == 3)) {
+		cmd = CMD_VERIFY;
+		imagefile = argv[1];
+		device = argv[2];
 	} else if ((strcmp(argv[0], "write") == 0) && (argc == 3)) {
 		cmd = CMD_WRITE;
 		device = argv[2];
@@ -724,6 +807,9 @@ int main (int argc, char **argv)
 			if (!unlocked)
 				mtd_unlock(device);
 			break;
+		case CMD_VERIFY:
+			mtd_verify(device, imagefile);
+			break;
 		case CMD_ERASE:
 			if (!unlocked)
 				mtd_unlock(device);
@@ -738,9 +824,6 @@ int main (int argc, char **argv)
 			if (!unlocked)
 				mtd_unlock(device);
 			mtd_write_jffs2(device, imagefile, jffs2dir);
-			break;
-		case CMD_REFRESH:
-			mtd_refresh(device);
 			break;
 		case CMD_FIXTRX:
 		    if (mtd_fixtrx) {

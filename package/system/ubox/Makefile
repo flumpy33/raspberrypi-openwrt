@@ -1,15 +1,16 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ubox
-PKG_VERSION:=2013-06-29
+PKG_VERSION:=2014-05-30
 PKG_RELEASE=$(PKG_SOURCE_VERSION)
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=git://nbd.name/luci2/ubox.git
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_VERSION:=0a4e3d257da46a7c0232362ac82a01a8c15ae6d5
+PKG_SOURCE_VERSION:=c3d4118eee505f41c4d20a87f326479530837569
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 CMAKE_INSTALL:=1
+PKG_CHECK_FORMAT_SECURITY:=0
 
 PKG_LICENSE:=GPLv2
 PKG_LICENSE_FILES:=
@@ -24,40 +25,22 @@ TARGET_LDFLAGS += $(if $(CONFIG_USE_EGLIBC),-lrt)
 define Package/ubox
   SECTION:=base
   CATEGORY:=Base system
-  DEPENDS:=+libubox +ubusd +ubus +libuci +USE_EGLIBC:librt
+  DEPENDS:=+libubox +ubusd +ubus +libubus +libuci +USE_EGLIBC:librt
   TITLE:=OpenWrt system helper toolbox
 endef
 
-define Package/block-mount
-  SECTION:=base
-  CATEGORY:=Base system
-  TITLE:=Block device mounting and checking
-  DEPENDS:=+ubox
-  MENU:=1
-endef
-
 define Package/ubox/install
-	$(INSTALL_DIR) $(1)/sbin $(1)/usr/sbin
+	$(INSTALL_DIR) $(1)/sbin $(1)/usr/sbin $(1)/lib/ $(1)/etc/init.d/
 
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/{mount_root,kmodloader,lsbloader,board} $(1)/sbin/
-	ln -s /sbin/mount_root $(1)/sbin/switch2jffs
-	ln -s /sbin/mount_root $(1)/sbin/jffs2reset
-	ln -s /sbin/mount_root $(1)/sbin/jffs2mark
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/{kmodloader,logd,logread,validate_data} $(1)/sbin/
+	$(INSTALL_BIN) ./files/log.init $(1)/etc/init.d/log
+	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/usr/lib/libvalidate.so $(1)/lib
+
+	ln -s /sbin/kmodloader $(1)/usr/sbin/rmmod
+	ln -s /sbin/kmodloader $(1)/usr/sbin/insmod
 	ln -s /sbin/kmodloader $(1)/usr/sbin/lsmod
 	ln -s /sbin/kmodloader $(1)/usr/sbin/modinfo
-endef
-
-define Package/block-mount/install
-	$(INSTALL_DIR) $(1)/sbin $(1)/usr/sbin $(1)/etc/hotplug.d/block $(1)/etc/init.d/
-
-	$(INSTALL_BIN) ./files/fstab.init $(1)/etc/init.d/fstab
-	$(INSTALL_DATA) ./files/mount.hotplug $(1)/etc/hotplug.d/block/10-mount
-
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/block $(1)/sbin/
-	ln -s /sbin/block $(1)/usr/sbin/swapon
-	ln -s /sbin/block $(1)/usr/sbin/swapoff
-
+	ln -s /sbin/kmodloader $(1)/usr/sbin/modprobe
 endef
 
 $(eval $(call BuildPackage,ubox))
-$(eval $(call BuildPackage,block-mount))

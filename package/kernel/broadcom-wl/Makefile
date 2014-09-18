@@ -10,7 +10,7 @@ include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=broadcom-wl
 PKG_VERSION:=5.10.56.27.3
-PKG_RELEASE:=5
+PKG_RELEASE:=7
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)_$(ARCH).tar.bz2
 PKG_SOURCE_URL:=http://downloads.openwrt.org/sources
@@ -18,6 +18,8 @@ PKG_SOURCE_URL:=http://downloads.openwrt.org/sources
 PKG_MD5SUM.mipsel:=3363e3a6b3d9d73c49dea870c7834eac
 PKG_MD5SUM.mips:=f8de63debc75333d6b4e28193eb051ff
 PKG_MD5SUM:=$(PKG_MD5SUM.$(ARCH))
+
+PKG_USE_MIPS16:=0
 
 include $(INCLUDE_DIR)/package.mk
 

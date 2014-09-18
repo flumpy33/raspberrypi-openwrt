@@ -3,7 +3,7 @@
 @@ -90,8 +90,13 @@ all-$(CONFIG_SYS_SUPPORTS_ZBOOT)+= vmlin
  cflags-y			+= -G 0 -mno-abicalls -fno-pic -pipe -mno-branch-likely
  cflags-y			+= -msoft-float
- LDFLAGS_vmlinux			+= -G 0 -static -n -nostdlib --gc-sections
+ LDFLAGS_vmlinux			+= -G 0 -static -n -nostdlib --gc-sections --sort-section=name
 +ifdef CONFIG_64BIT
  KBUILD_AFLAGS_MODULE		+= -mlong-calls
  KBUILD_CFLAGS_MODULE		+= -mlong-calls
@@ -30,7 +30,7 @@
  typedef uint8_t Elf64_Byte;		/* Type for a 8-bit quantity.  */
 --- a/arch/mips/kernel/module.c
 +++ b/arch/mips/kernel/module.c
-@@ -42,14 +42,219 @@ struct mips_hi16 {
+@@ -42,14 +42,222 @@ struct mips_hi16 {
  static LIST_HEAD(dbe_list);
  static DEFINE_SPINLOCK(dbe_lock);
  
@@ -220,17 +220,20 @@
 +	unsigned int core_size, init_size;
 +	int i;
 +
++	mod->arch.phys_plt_offset = 0;
++	mod->arch.virt_plt_offset = 0;
++	mod->arch.phys_plt_tbl = NULL;
++	mod->arch.virt_plt_tbl = NULL;
++
++	if (IS_ENABLED(CONFIG_64BIT))
++		return 0;
++
 +	for (i = 1; i < hdr->e_shnum; i++)
 +		if (sechdrs[i].sh_type == SHT_SYMTAB)
 +			symindex = i;
 +
 +	core_size = get_plt_size(hdr, sechdrs, secstrings, symindex, false);
 +	init_size = get_plt_size(hdr, sechdrs, secstrings, symindex, true);
-+
-+	mod->arch.phys_plt_offset = 0;
-+	mod->arch.virt_plt_offset = 0;
-+	mod->arch.phys_plt_tbl = NULL;
-+	mod->arch.virt_plt_tbl = NULL;
 +
 +	if ((core_size + init_size) == 0)
 +		return 0;
@@ -251,7 +254,7 @@
  
  int apply_r_mips_none(struct module *me, u32 *location, Elf_Addr v)
  {
-@@ -63,8 +268,39 @@ static int apply_r_mips_32_rel(struct mo
+@@ -63,8 +271,39 @@ static int apply_r_mips_32_rel(struct mo
  	return 0;
  }
  
@@ -291,7 +294,7 @@
  	if (v % 4) {
  		pr_err("module %s: dangerous R_MIPS_26 REL relocation\n",
  		       me->name);
-@@ -72,14 +308,17 @@ static int apply_r_mips_26_rel(struct mo
+@@ -72,14 +311,17 @@ static int apply_r_mips_26_rel(struct mo
  	}
  
  	if ((v & 0xf0000000) != (((unsigned long)location + 4) & 0xf0000000)) {
@@ -314,7 +317,7 @@
  
  	return 0;
  }
-@@ -286,11 +525,32 @@ int module_finalize(const Elf_Ehdr *hdr,
+@@ -286,11 +528,32 @@ int module_finalize(const Elf_Ehdr *hdr,
  		list_add(&me->arch.dbe_list, &dbe_list);
  		spin_unlock_irq(&dbe_lock);
  	}

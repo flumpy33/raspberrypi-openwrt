@@ -7,13 +7,6 @@
 	model = "Alpha ASL26555";
 
 	palmbus@10000000 {
-		sysc@0 {
-			ralink,pinmux = "spi", "mdio", "uartlite", "sdram", "rgmii";
-			ralink,gpiomux = "i2c", "jtag";
-			ralink,uartmux = "gpio";
-			ralink,wdtmux = <1>;
-		};
-
 		gpio0: gpio@600 {
 			status = "okay";
 		};
@@ -33,8 +26,8 @@
 					reg = <0x0 0x30000>;
 					read-only;
 				};
-				partition@30000 {
-					label = "devdata";
+				ubootenv: partition@30000 {
+					label = "uboot-env";
 					reg = <0x30000 0x10000>;
 					read-only;
 				};
@@ -61,17 +54,25 @@
 		};
 	};
 
+	pinctrl {
+		state_default: pinctrl0 {
+			gpio {
+				ralink,group = "i2c", "jtag", "rgmii", "mdio", "uartf";
+				ralink,function = "gpio";
+			};
+		};
+	};
+
 	ethernet@10100000 {
-		status = "okay";
+		mtd-mac-address = <&ubootenv 0x4004>;
 	};
 
 	esw@10110000 {
-		status = "okay";
 		ralink,portmap = <0x1e>;
 	};
 
 	wmac@10180000 {
-		status = "okay";
+		ralink,mtd-eeprom = <&ubootenv 0x4000>;
 	};
 
 	otg@101c0000 {

@@ -89,6 +89,9 @@
 
 			reg-shift = <2>;
 
+			pinctrl-names = "default";
+			pinctrl-0 = <&uartf_pins>;
+
 			status = "disabled";
 		};
 
@@ -106,34 +109,13 @@
 			#gpio-cells = <2>;
 
 			ralink,gpio-base = <0>;
-			ralink,num-gpios = <24>;
+			ralink,num-gpios = <22>;
 			ralink,register-map = [ 00 04 08 0c
 						20 24 28 2c
 						30 34 ];
-
-			status = "disabled";
 		};
 
-		gpio1: gpio@638 {
-			compatible = "ralink,rt5350-gpio", "ralink,rt2880-gpio";
-			reg = <0x638 0x24>;
-
-			interrupt-parent = <&intc>;
-			interrupts = <6>;
-
-			gpio-controller;
-			#gpio-cells = <2>;
-
-			ralink,gpio-base = <24>;
-			ralink,num-gpios = <16>;
-			ralink,register-map = [ 00 04 08 0c
-						10 14 18 1c
-						20 24 ];
-
-			status = "disabled";
-		};
-
-		gpio2: gpio@660 {
+		gpio1: gpio@660 {
 			compatible = "ralink,rt5350-gpio", "ralink,rt2880-gpio";
 			reg = <0x660 0x24>;
 
@@ -143,8 +125,8 @@
 			gpio-controller;
 			#gpio-cells = <2>;
 
-			ralink,gpio-base = <40>;
-			ralink,num-gpios = <12>;
+			ralink,gpio-base = <22>;
+			ralink,num-gpios = <6>;
 			ralink,register-map = [ 00 04 08 0c
 						10 14 18 1c
 						20 24 ];
@@ -162,11 +144,14 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
+			pinctrl-names = "default";
+			pinctrl-0 = <&i2c_pins>;
+
 			status = "disabled";
 		};
 
 		spi@b00 {
-			compatible = "ralink,rt5350-spi", "ralink,rt2880-spi";
+			compatible = "ralink,rt5350-spi";
 			reg = <0xb00 0x100>;
 
 			resets = <&rstctrl 18>;
@@ -174,6 +159,9 @@
 
 			#address-cells = <1>;
 			#size-cells = <1>;
+
+			pinctrl-names = "default";
+			pinctrl-0 = <&spi_pins &spi_cs1>;
 
 			status = "disabled";
 		};
@@ -188,6 +176,9 @@
 			interrupt-parent = <&intc>;
 			interrupts = <12>;
 
+			pinctrl-names = "default";
+			pinctrl-0 = <&uartlite_pins>;
+
 			reg-shift = <2>;
 		};
 
@@ -200,12 +191,59 @@
 		};
 	};
 
+	pinctrl {
+		compatible = "ralink,rt2880-pinmux";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&state_default>;
+
+		state_default: pinctrl0 {
+		};
+
+		spi_pins: spi {
+			spi {
+				ralink,group = "spi";
+				ralink,function = "spi";
+			};
+		};
+		i2c_pins: i2c {
+			i2c {
+				ralink,group = "i2c";
+				ralink,function = "i2c";
+			};
+		};
+		phy_led_pins: phy_led {
+			phy_led {
+				ralink,group = "led";
+				ralink,function = "led";
+			};
+		};
+		uartlite_pins: uartlite {
+			uart {
+				ralink,group = "uartlite";
+				ralink,function = "uartlite";
+			};
+		};
+		uartf_pins: uartf {
+			uartf {
+				ralink,group = "uartf";
+				ralink,function = "uartf";
+			};
+		};
+		spi_cs1: spi1 {
+			spi1 {
+				ralink,group = "spi_cs1";
+				ralink,function = "spi_cs1";
+			};
+		};
+	};
+
 	rstctrl: rstctrl {
 		compatible = "ralink,rt5350-reset", "ralink,rt2880-reset";
 		#reset-cells = <1>;
 	};
 
-	ubsphy {
+	usbphy {
 		compatible = "ralink,rt3xxx-usbphy";
 
 		resets = <&rstctrl 22 &rstctrl 25>;
@@ -218,8 +256,6 @@
 
 		interrupt-parent = <&cpuintc>;
 		interrupts = <5>;
-
-		status = "disabled";
 	};
 
 	esw@10110000 {
@@ -228,8 +264,6 @@
 
 		interrupt-parent = <&intc>;
 		interrupts = <17>;
-
-		status = "disabled";
 	};
 
 	wmac@10180000 {
@@ -240,8 +274,6 @@
 		interrupts = <6>;
 
 		ralink,eeprom = "soc_wmac.eeprom";
-
-		status = "disabled";
 	};
 
 	ehci@101c0000 {

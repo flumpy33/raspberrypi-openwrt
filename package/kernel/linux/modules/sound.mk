@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2012 OpenWrt.org
+# Copyright (C) 2006-2013 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -11,7 +11,6 @@ SOUND_MENU:=Sound Support
 SOUNDCORE_LOAD ?= \
 	soundcore \
 	snd \
-	snd-page-alloc \
 	snd-hwdep \
 	snd-seq-device \
 	snd-rawmidi \
@@ -23,7 +22,6 @@ SOUNDCORE_LOAD ?= \
 SOUNDCORE_FILES ?= \
 	$(LINUX_DIR)/sound/soundcore.ko \
 	$(LINUX_DIR)/sound/core/snd.ko \
-	$(LINUX_DIR)/sound/core/snd-page-alloc.ko \
 	$(LINUX_DIR)/sound/core/snd-hwdep.ko \
 	$(LINUX_DIR)/sound/core/seq/snd-seq-device.ko \
 	$(LINUX_DIR)/sound/core/snd-rawmidi.ko \
@@ -38,6 +36,22 @@ SOUNDCORE_LOAD += \
 
 SOUNDCORE_FILES += \
 	$(LINUX_DIR)/sound/core/snd-compress.ko
+endif
+
+ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),ge,3.12.0)),1)
+SOUNDCORE_LOAD += \
+	$(if $(CONFIG_SND_DMAENGINE_PCM),snd-pcm-dmaengine)
+
+SOUNDCORE_FILES += \
+	$(if $(CONFIG_SND_DMAENGINE_PCM),$(LINUX_DIR)/sound/core/snd-pcm-dmaengine.ko)
+endif
+
+ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),lt,3.14.0)),1)
+SOUNDCORE_LOAD += \
+	snd-page-alloc
+
+SOUNDCORE_FILES += \
+	$(LINUX_DIR)/sound/core/snd-page-alloc.ko
 endif
 
 define KernelPackage/sound-core
@@ -147,7 +161,7 @@ define KernelPackage/sound-cs5535audio
 endef
 
 define KernelPackage/sound-cs5535audio/description
- support for the integrated AC97 sound device on olpc
+ Support for the integrated AC97 sound device on olpc
 endef
 
 $(eval $(call KernelPackage,sound-cs5535audio))
@@ -155,7 +169,7 @@ $(eval $(call KernelPackage,sound-cs5535audio))
 
 define KernelPackage/sound-soc-core
   TITLE:=SoC sound support
-  DEPENDS:=+kmod-regmap
+  DEPENDS:=+kmod-regmap +kmod-ac97
   KCONFIG:= \
 	CONFIG_SND_SOC \
 	CONFIG_SND_SOC_DMAENGINE_PCM=y \
@@ -173,11 +187,65 @@ define KernelPackage/sound-soc-ac97
   KCONFIG:=CONFIG_SND_SOC_AC97_CODEC
   FILES:=$(LINUX_DIR)/sound/soc/codecs/snd-soc-ac97.ko
   AUTOLOAD:=$(call AutoLoad,57,snd-soc-ac97)
-  DEPENDS:=+kmod-ac97 +kmod-sound-soc-core
+  DEPENDS:=+kmod-ac97 +kmod-sound-soc-core +TARGET_ep93xx:kmod-sound-soc-ep93xx-ac97
   $(call AddDepends/sound)
 endef
 
 $(eval $(call KernelPackage,sound-soc-ac97))
+
+
+define KernelPackage/sound-soc-imx
+  TITLE:=IMX SoC support
+ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),lt,3.12.0)),1)
+  KCONFIG:=\
+	CONFIG_SND_IMX_SOC \
+	CONFIG_SND_SOC_IMX_AUDMUX \
+	CONFIG_SND_SOC_FSL_SSI \
+	CONFIG_SND_SOC_IMX_PCM
+  FILES:= \
+	$(LINUX_DIR)/sound/soc/fsl/snd-soc-imx-audmux.ko \
+	$(LINUX_DIR)/sound/soc/fsl/snd-soc-fsl-ssi.ko \
+	$(LINUX_DIR)/sound/soc/fsl/snd-soc-imx-pcm.ko
+  AUTOLOAD:=$(call AutoLoad,56,snd-soc-imx-audmux snd-soc-fsl-ssi snd-soc-imx-pcm)
+else
+  KCONFIG:=\
+	CONFIG_SND_IMX_SOC \
+	CONFIG_SND_SOC_IMX_AUDMUX \
+	CONFIG_SND_SOC_FSL_SSI \
+	CONFIG_SND_SOC_IMX_PCM_DMA
+  FILES:= \
+	$(LINUX_DIR)/sound/soc/fsl/snd-soc-imx-audmux.ko \
+	$(LINUX_DIR)/sound/soc/fsl/snd-soc-fsl-ssi.ko \
+	$(LINUX_DIR)/sound/soc/fsl/imx-pcm-dma.ko
+  AUTOLOAD:=$(call AutoLoad,56,snd-soc-imx-audmux snd-soc-fsl-ssi snd-soc-imx-pcm)
+endif
+  DEPENDS:=@TARGET_imx6 +kmod-sound-soc-core
+  $(call AddDepends/sound)
+endef
+
+define KernelPackage/sound-soc-imx/description
+ Support for i.MX6 Platform sound (ssi/audmux/pcm)
+endef
+
+$(eval $(call KernelPackage,sound-soc-imx))
+
+
+define KernelPackage/sound-soc-imx-sgtl5000
+  TITLE:=IMX SoC support for SGTL5000
+  KCONFIG:=CONFIG_SND_SOC_IMX_SGTL5000
+  FILES:=\
+	$(LINUX_DIR)/sound/soc/codecs/snd-soc-sgtl5000.ko \
+	$(LINUX_DIR)/sound/soc/fsl/snd-soc-imx-sgtl5000.ko
+  AUTOLOAD:=$(call AutoLoad,57,snd-soc-sgtl5000 snd-soc-imx-sgtl5000)
+  DEPENDS:=@TARGET_imx6 +kmod-sound-soc-imx
+  $(call AddDepends/sound)
+endef
+
+define KernelPackage/sound-soc-imx-sgtl5000/description
+ Support for i.MX6 Platform sound SGTL5000 codec
+endef
+
+$(eval $(call KernelPackage,sound-soc-imx-sgtl5000))
 
 
 define KernelPackage/sound-soc-gw_avila
@@ -200,7 +268,7 @@ $(eval $(call KernelPackage,sound-soc-gw_avila))
 
 
 define KernelPackage/pcspkr
-  DEPENDS:=@!TARGET_x86
+  DEPENDS:=@TARGET_x86
   TITLE:=PC speaker support
   KCONFIG:= \
 	CONFIG_INPUT_PCSPKR \

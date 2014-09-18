@@ -16,6 +16,8 @@ PKG_BUILD_DIR:=$(KERNEL_BUILD_DIR)/drv_dsl_cpe_api-$(PKG_VERSION)
 PKG_SOURCE_URL:=http://mirror2.openwrt.org/sources/
 PKG_MD5SUM:=b6d9c1e3c5db1bfcd6e81bb2f582cadb
 
+PKG_USE_MIPS16:=0
+
 PKG_MAINTAINER:=John Crispin <blogic@openwrt.org>
 
 include $(INCLUDE_DIR)/package.mk
@@ -24,7 +26,7 @@ define KernelPackage/ltq-vdsl-vr9
   TITLE:=vdsl driver
   SECTION:=sys
   SUBMENU:=Network Devices
-  DEPENDS:=@TARGET_lantiq_xway +kmod-ltq-vdsl-vr9-mei
+  DEPENDS:=@TARGET_lantiq_xrx200 +kmod-ltq-vdsl-vr9-mei
   FILES:=$(PKG_BUILD_DIR)/src/drv_dsl_cpe_api.ko
   AUTOLOAD:=$(call AutoLoad,51,drv_dsl_cpe_api)
 endef
@@ -37,6 +39,9 @@ define Package/ltq-vdsl-vr9/description
 endef
 
 EXTRA_CFLAGS = -fno-pic -mno-abicalls -mlong-calls -G 0
+
+MAKE_FLAGS += \
+	SHELL="$(BASH)"
 
 CONFIGURE_ARGS += --enable-kernel-include="$(LINUX_DIR)/include" \
 	--with-max-device="1" \

@@ -1,14 +1,14 @@
 --- a/include/image.h
 +++ b/include/image.h
-@@ -34,7 +34,6 @@
+@@ -17,7 +17,6 @@
  #define __IMAGE_H__
  
  #include "compiler.h"
 -#include <asm/byteorder.h>
  
- #ifdef USE_HOSTCC
- 
-@@ -191,13 +190,13 @@
+ /* Define this to avoid #ifdefs later on */
+ struct lmb;
+@@ -257,13 +256,13 @@
   * all data in network byte order (aka natural aka bigendian).
   */
  typedef struct image_header {

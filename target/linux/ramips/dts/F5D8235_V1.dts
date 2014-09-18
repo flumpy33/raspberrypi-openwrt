@@ -9,15 +9,17 @@
 	model = "Belkin F5D8235 v1";
 
 	palmbus@300000 {
-		sysc@0 {
-			ralink,pinmux = "uartlite";
-			ralink,gpiomux = "i2c";
-			ralink,uartmux = "gpio";
-			ralink,wdtmux = <1>;
-		};
-
 		gpio0: gpio@600 {
 			status = "okay";
+		};
+	};
+
+	pinctrl {
+		state_default: pinctrl0 {
+			gpio {
+				ralink,group = "spi", "i2c", "jtag", "rgmii", "mdio", "uartf";
+				ralink,function = "gpio";
+			};
 		};
 	};
 
@@ -40,8 +42,8 @@
 			reg = <0x30000 0x10000>;
 			read-only;
 		};
-		partition@40000 {
-			label = "calibration";
+		factory: partition@40000 {
+			label = "factory";
 			reg = <0x40000 0x10000>;
 			read-only;
 		};
@@ -53,16 +55,19 @@
 
 	ethernet@400000 {
 		status = "okay";
+		mtd-mac-address = <&factory 0x4>;
 
                 port@0 {
 			ralink,fixed-link = <1000 1 1 1>;
 		};
 	};
 
-	wmac@480000 {
+	/* FIXME: no u-boot partition and 0x40000@uboot is out of boundaries */
+/*	wmac@480000 {
 		status = "okay";
+		ralink,mtd-eeprom = <&u-boot 0x40000>;
 	};
-
+*/
 	rtl8367s {
 		compatible = "realtek,rtl8367s";
 		gpio-sda = <&gpio0 1 0>;

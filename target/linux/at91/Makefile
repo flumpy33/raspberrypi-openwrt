@@ -11,9 +11,9 @@ BOARD:=at91
 MAINTAINER:=Claudio Mignanti <c.mignanti@gmail.com>
 BOARDNAME:=Atmel AT91
 FEATURES:=squashfs targz ext2 usb
-CFLAGS:=-Os -pipe -march=armv5te -mtune=arm926ej-s -fno-caller-saves
+SUBTARGETS:=legacy sama5d3
 
-LINUX_VERSION:=3.8.13
+LINUX_VERSION:=3.14.18
 
 include $(INCLUDE_DIR)/target.mk
 

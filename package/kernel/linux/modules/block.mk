@@ -16,7 +16,7 @@ define KernelPackage/aoe
 endef
 
 define KernelPackage/aoe/description
-  Kernel support for ATA over Ethernet
+ Kernel support for ATA over Ethernet
 endef
 
 $(eval $(call KernelPackage,aoe))
@@ -28,7 +28,6 @@ define KernelPackage/ata-core
   DEPENDS:=@PCI_SUPPORT +kmod-scsi-core
   KCONFIG:=CONFIG_ATA
   FILES:=$(LINUX_DIR)/drivers/ata/libata.ko
-  AUTOLOAD:=$(call AutoLoad,21,libata,1)
 endef
 
 $(eval $(call KernelPackage,ata-core))
@@ -51,7 +50,7 @@ define KernelPackage/ata-ahci
 endef
 
 define KernelPackage/ata-ahci/description
- Support for AHCI Serial ATA controllers.
+ Support for AHCI Serial ATA controllers
 endef
 
 $(eval $(call KernelPackage,ata-ahci))
@@ -66,10 +65,29 @@ define KernelPackage/ata-artop
 endef
 
 define KernelPackage/ata-artop/description
- PATA support for ARTOP 6210/6260 host controllers.
+ PATA support for ARTOP 6210/6260 host controllers
 endef
 
 $(eval $(call KernelPackage,ata-artop))
+
+
+define KernelPackage/ata-imx
+  TITLE:=Freescale i.MX AHCI SATA support
+  DEPENDS:=@TARGET_imx6
+  KCONFIG:=\
+	CONFIG_AHCI_IMX \
+	CONFIG_SATA_AHCI_PLATFORM \
+	CONFIG_PATA_IMX=n
+  FILES:=$(LINUX_DIR)/drivers/ata/ahci_imx.ko
+  AUTOLOAD:=$(call AutoLoad,41,ahci_imx,1)
+  $(call AddDepends/ata)
+endef
+
+define KernelPackage/ata-imx/description
+ SATA support for the Freescale i.MX6 SoC's onboard AHCI SATA
+endef
+
+$(eval $(call KernelPackage,ata-imx))
 
 
 define KernelPackage/ata-marvell-sata
@@ -111,7 +129,7 @@ endef
 
 define KernelPackage/ata-pdc202xx-old/description
  This option enables support for the Promise 20246, 20262, 20263,
- 20265 and 20267 adapters.
+ 20265 and 20267 adapters
 endef
 
 $(eval $(call KernelPackage,ata-pdc202xx-old))
@@ -127,7 +145,7 @@ endef
 
 define KernelPackage/ata-piix/description
  SATA support for Intel ICH5/6/7/8 series host controllers and
- PATA support for Intel ESB/ICH/PIIX3/PIIX4 series host controllers.
+ PATA support for Intel ESB/ICH/PIIX3/PIIX4 series host controllers
 endef
 
 $(eval $(call KernelPackage,ata-piix))
@@ -142,7 +160,7 @@ define KernelPackage/ata-sil
 endef
 
 define KernelPackage/ata-sil/description
- Support for Silicon Image Serial ATA controllers.
+ Support for Silicon Image Serial ATA controllers
 endef
 
 $(eval $(call KernelPackage,ata-sil))
@@ -157,25 +175,10 @@ define KernelPackage/ata-sil24
 endef
 
 define KernelPackage/ata-sil24/description
- Support for Silicon Image 3124/3132 Serial ATA controllers.
+ Support for Silicon Image 3124/3132 Serial ATA controllers
 endef
 
 $(eval $(call KernelPackage,ata-sil24))
-
-
-define KernelPackage/ata-sis
-  TITLE:=SIS SATA support
-  KCONFIG:=CONFIG_SATA_SIS
-  FILES:=$(LINUX_DIR)/drivers/ata/sata_sis.ko
-  AUTOLOAD:=$(call AutoLoad,41,sata_sis,1)
-  $(call AddDepends/ata)
-endef
-
-define KernelPackage/ata-sis/description
- Support for SIS Serial ATA controllers.
-endef
-
-$(eval $(call KernelPackage,ata-sis))
 
 
 define KernelPackage/ata-via-sata
@@ -187,7 +190,7 @@ define KernelPackage/ata-via-sata
 endef
 
 define KernelPackage/ata-via-sata/description
- This option enables support for VIA Serial ATA.
+ This option enables support for VIA Serial ATA
 endef
 
 $(eval $(call KernelPackage,ata-via-sata))
@@ -206,6 +209,7 @@ $(eval $(call KernelPackage,block2mtd))
 define KernelPackage/dm
   SUBMENU:=$(BLOCK_MENU)
   TITLE:=Device Mapper
+  DEPENDS:=+kmod-crypto-manager
   # All the "=n" are unnecessary, they're only there
   # to stop the config from asking the question.
   # MIRROR is M because I've needed it for pvmove.
@@ -320,29 +324,25 @@ $(eval $(call KernelPackage,md-raid10))
 
 
 define KernelPackage/md-raid456
-$(call KernelPackage/md/Depends,)
+$(call KernelPackage/md/Depends,+kmod-lib-raid6 +kmod-lib-xor)
   TITLE:=RAID Level 456 Driver
   KCONFIG:= \
-       CONFIG_XOR_BLOCKS \
        CONFIG_ASYNC_CORE \
        CONFIG_ASYNC_MEMCPY \
        CONFIG_ASYNC_XOR \
        CONFIG_ASYNC_PQ \
        CONFIG_ASYNC_RAID6_RECOV \
        CONFIG_ASYNC_RAID6_TEST=n \
-       CONFIG_MD_RAID6_PQ \
        CONFIG_MD_RAID456 \
        CONFIG_MULTICORE_RAID456=n
   FILES:= \
-	$(LINUX_DIR)/crypto/xor.ko \
 	$(LINUX_DIR)/crypto/async_tx/async_tx.ko \
 	$(LINUX_DIR)/crypto/async_tx/async_memcpy.ko \
 	$(LINUX_DIR)/crypto/async_tx/async_xor.ko \
 	$(LINUX_DIR)/crypto/async_tx/async_pq.ko \
 	$(LINUX_DIR)/crypto/async_tx/async_raid6_recov.ko \
-	$(LINUX_DIR)/drivers/md/raid456.ko \
-	$(LINUX_DIR)/lib/raid6/raid6_pq.ko
-  AUTOLOAD:=$(call AutoLoad,28, xor async_tx async_memcpy async_xor raid6_pq async_pq async_raid6_recov raid456)
+	$(LINUX_DIR)/drivers/md/raid456.ko
+  AUTOLOAD:=$(call AutoLoad,28, async_tx async_memcpy async_xor async_pq async_raid6_recov raid456)
 endef
 
 define KernelPackage/md-raid456/description
@@ -394,9 +394,6 @@ define KernelPackage/ide-core
   FILES:= \
 	$(LINUX_DIR)/drivers/ide/ide-core.ko \
 	$(LINUX_DIR)/drivers/ide/ide-gd_mod.ko
-  AUTOLOAD:= \
-	$(call AutoLoad,20,ide-core,1) \
-	$(call AutoLoad,40,ide-gd_mod,1)
 endef
 
 define KernelPackage/ide-core/description
@@ -450,7 +447,7 @@ define KernelPackage/ide-aec62xx
 endef
 
 define KernelPackage/ide-aec62xx/description
- Support for Acard AEC62xx (Artop ATP8xx) IDE controllers.
+ Support for Acard AEC62xx (Artop ATP8xx) IDE controllers
 endef
 
 $(eval $(call KernelPackage,ide-aec62xx,1))
@@ -483,7 +480,7 @@ define KernelPackage/ide-it821x
 endef
 
 define KernelPackage/ide-it821x/description
-  Kernel module for the ITE IDE821x IDE controllers.
+ Kernel module for the ITE IDE821x IDE controllers
 endef
 
 $(eval $(call KernelPackage,ide-it821x))
@@ -491,6 +488,7 @@ $(eval $(call KernelPackage,ide-it821x))
 
 define KernelPackage/libsas
   SUBMENU:=$(BLOCK_MENU)
+  DEPENDS:=@TARGET_x86
   TITLE:=SAS Domain Transport Attributes
   KCONFIG:=CONFIG_SCSI_SAS_LIBSAS \
 	CONFIG_SCSI_SAS_ATTRS \
@@ -504,7 +502,7 @@ define KernelPackage/libsas
 endef
 
 define KernelPackage/libsas/description
-  SAS Domain Transport Attributes support.
+ SAS Domain Transport Attributes support
 endef
 
 $(eval $(call KernelPackage,libsas,1))
@@ -539,7 +537,7 @@ define KernelPackage/mvsas
 endef
 
 define KernelPackage/mvsas/description
-  Kernel support for the Marvell SAS SCSI adapters
+ Kernel support for the Marvell SAS SCSI adapters
 endef
 
 $(eval $(call KernelPackage,mvsas))
@@ -569,7 +567,7 @@ define KernelPackage/scsi-core
   FILES:= \
 	$(if $(findstring y,$(CONFIG_SCSI)),,$(LINUX_DIR)/drivers/scsi/scsi_mod.ko) \
 	$(LINUX_DIR)/drivers/scsi/sd_mod.ko
-  AUTOLOAD:=$(call AutoLoad,20,scsi_mod,1) $(call AutoLoad,40,sd_mod,1)
+  AUTOLOAD:=$(call AutoLoad,40,sd_mod,1)
 endef
 
 $(eval $(call KernelPackage,scsi-core))
@@ -599,8 +597,7 @@ define KernelPackage/scsi-cdrom
   FILES:= \
     $(LINUX_DIR)/drivers/cdrom/cdrom.ko \
     $(LINUX_DIR)/drivers/scsi/sr_mod.ko
-  AUTOLOAD:=$(call AutoLoad,30,cdrom) $(call AutoLoad,45,sr_mod)
+  AUTOLOAD:=$(call AutoLoad,45,sr_mod)
 endef
 
 $(eval $(call KernelPackage,scsi-cdrom))
-
